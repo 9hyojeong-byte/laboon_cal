@@ -239,7 +239,10 @@ function EventCard({
   const attendeesCount = ev.attendees ? ev.attendees.split(',').map(n => n.trim()).filter(Boolean).length : 0;
 
   return (
-    <div className={`${cardBg} rounded-3xl border ${cardBorder} ${hoverClasses} p-5 transition-all duration-200 flex flex-col space-y-4 relative overflow-hidden pl-7 shadow-sm`}>
+    <div
+      onClick={() => onEventClick(ev)}
+      className={`${cardBg} rounded-3xl border ${cardBorder} ${hoverClasses} p-5 transition-all duration-200 flex flex-col space-y-4 relative overflow-hidden pl-7 shadow-sm cursor-pointer`}
+    >
       {/* Side Color stripe */}
       <div className={`absolute left-0 top-0 bottom-0 w-[5px] ${sideColorClass}`} />
 
@@ -305,9 +308,8 @@ function EventCard({
         </div>
       )}
 
-      {/* 5. Description Memo */}
       {ev.description && (
-        <div onClick={() => onEventClick(ev)} className="cursor-pointer text-xs md:text-[13px] text-foreground/80 font-medium leading-relaxed break-all whitespace-pre-line flex-1 flex items-start gap-2">
+        <div className="text-xs md:text-[13px] text-foreground/80 font-medium leading-relaxed break-all whitespace-pre-line flex-1 flex items-start gap-2">
           <span className="shrink-0 select-none">💬</span>
           <span>{ev.description}</span>
         </div>
@@ -317,7 +319,7 @@ function EventCard({
       {ev.attendees && (
         <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-4 select-none shrink-0">
           {/* Attendees List */}
-          <div onClick={() => onEventClick(ev)} className="cursor-pointer flex flex-wrap gap-1.5 flex-1">
+          <div className="flex flex-wrap gap-1.5 flex-1">
             {ev.attendees.split(',').map(n => n.trim()).filter(Boolean).map((name, idx) => {
               const isLeader = idx === 0;
               const attendeeBadgeClass = isLeader
