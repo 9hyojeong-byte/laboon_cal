@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, CheckCircle2, ShieldAlert, X, Zap, Download, Search } from 'lucide-react';
+import { Plus, CheckCircle2, ShieldAlert, X, Zap, Download, Search, Key } from 'lucide-react';
 import { ScheduleEvent } from './types';
 import CalendarView from './components/CalendarView';
 import EventListView from './components/EventListView';
@@ -41,6 +41,23 @@ export default function App() {
     const checkStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
     setIsStandalone(!!checkStandalone);
   }, []);
+
+  const [isAdminMode, setIsAdminMode] = useState(false);
+
+  const handleToggleAdminMode = () => {
+    if (isAdminMode) {
+      setIsAdminMode(false);
+      alert("관리자 모드가 해제되었습니다.");
+    } else {
+      const val = prompt("관리자 비밀번호를 입력해주세요:");
+      if (val === 'laboon01') {
+        setIsAdminMode(true);
+        alert("관리자 모드가 활성화되었습니다. 이제 일정 추가/수정/삭제가 가능합니다.");
+      } else if (val !== null) {
+        alert("비밀번호가 일치하지 않습니다.");
+      }
+    }
+  };
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const initialDeepLinkChecked = useRef(false);
@@ -222,7 +239,7 @@ export default function App() {
     }
   };
 
-  const handleAddAttendeeToEvent = async (scheduleId: string, nickname: string) => {
+  const handleAddAttendeeToEvent = async (scheduleId: string, nickname: string, password?: string) => {
     const previousEvents = [...events];
     const previousSelectedEvent = selectedEventForDetail;
 
@@ -255,7 +272,7 @@ export default function App() {
 
     // 2. Perform DB write quietly in the background
     try {
-      await addAttendee(scheduleId, nickname);
+      await addAttendee(scheduleId, nickname, password);
       // Fetch latest DB state quietly to ensure full synchronization
       const loadedEvents = await fetchSchedules();
       setEvents(loadedEvents);
@@ -270,7 +287,7 @@ export default function App() {
     }
   };
 
-  const handleRemoveAttendeeFromEvent = async (scheduleId: string, nickname: string) => {
+  const handleRemoveAttendeeFromEvent = async (scheduleId: string, nickname: string, password?: string) => {
     const previousEvents = [...events];
     const previousSelectedEvent = selectedEventForDetail;
 
@@ -299,17 +316,17 @@ export default function App() {
 
     // 2. Perform DB write quietly in the background
     try {
-      await removeAttendee(scheduleId, nickname);
+      await removeAttendee(scheduleId, nickname, password);
       const loadedEvents = await fetchSchedules();
       setEvents(loadedEvents);
       const matched = loadedEvents.find(e => String(e.id) === String(scheduleId));
       if (matched) setSelectedEventForDetail(matched);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to remove participant in DB, rolling back:', err);
       // Rollback to original state on error
       setEvents(previousEvents);
       setSelectedEventForDetail(previousSelectedEvent);
-      alert('참석자 취소에 실패했습니다.');
+      throw err;
     }
   };
 
@@ -373,8 +390,15 @@ export default function App() {
                   Gathering Planner
                 </span>
               </div>
-              <h1 className="font-display text-[26px] tracking-tight text-foreground leading-none mt-1">
-                라분다이브 <span className="gradient-text font-display">캘린더</span>
+              <h1 className="font-display text-[26px] tracking-tight text-foreground leading-none mt-1 flex items-center gap-1.5 select-none">
+                <span>라분다이브 <span className="gradient-text font-display">캘린더</span></span>
+                <button 
+                  onClick={handleToggleAdminMode}
+                  className={`transition-all duration-200 cursor-pointer p-1 rounded-lg border ${isAdminMode ? 'text-accent border-accent/20 bg-accent/5' : 'text-muted-foreground/30 border-transparent hover:text-accent hover:border-accent/10 hover:bg-accent/5'}`}
+                  title={isAdminMode ? '관리자 모드 활성화됨 (클릭 시 해제)' : '관리자 로그인'}
+                >
+                  <Key className="w-4 h-4" strokeWidth={2.5} />
+                </button>
               </h1>
             </div>
 
@@ -458,6 +482,7 @@ export default function App() {
             onEventClick={handleOpenEventDetail}
             onSelectDate={setSelectedDate}
             searchQuery={searchQuery}
+            isAdminMode={isAdminMode}
           />
         </main>
 
@@ -484,17 +509,19 @@ export default function App() {
 
         {/* ── Event Detail Modal ── */}
         {selectedEventForDetail && (
-          <EventDetailModal
-            event={selectedEventForDetail}
-            onClose={handleCloseEventDetail}
-            onAddAttendee={handleAddAttendeeToEvent}
-            onRemoveAttendee={handleRemoveAttendeeFromEvent}
-            onEdit={(ev) => { setEditingEvent(ev); setIsFormOpen(true); }}
-            onDelete={handleDeleteEvent}
-          />
-        )}
-
-
+        <EventDetailModal
+          event={selectedEventForDetail}
+          onClose={handleCloseEventDetail}
+          onAddAttendee={handleAddAttendeeToEvent}
+          onRemoveAttendee={handleRemoveAttendeeFromEvent}
+          onEdit={(ev) => {
+            setEditingEvent(ev);
+            setIsFormOpen(true);
+          }}
+          onDelete={handleDeleteEvent}
+          isAdminMode={isAdminMode}
+        />
+      )}
 
         {/* ── Sync Loading Overlay ── */}
         {isLoading && syncStatus === 'syncing' && (

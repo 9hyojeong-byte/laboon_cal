@@ -6,10 +6,11 @@ import { formatTime } from '../lib/timeUtils';
 interface EventDetailModalProps {
   event: ScheduleEvent;
   onClose: () => void;
-  onAddAttendee: (scheduleId: string, nickname: string) => Promise<void>;
-  onRemoveAttendee: (scheduleId: string, nickname: string) => Promise<void>;
+  onAddAttendee: (scheduleId: string, nickname: string, password?: string) => Promise<void>;
+  onRemoveAttendee: (scheduleId: string, nickname: string, password?: string) => Promise<void>;
   onEdit: (event: ScheduleEvent) => void;
   onDelete: (id: string) => void;
+  isAdminMode?: boolean;
 }
 
 export default function EventDetailModal({
@@ -19,6 +20,7 @@ export default function EventDetailModal({
   onRemoveAttendee,
   onEdit,
   onDelete,
+  isAdminMode = false,
 }: EventDetailModalProps) {
   const [newName, setNewName] = useState('');
   const [savedMyName, setSavedMyName] = useState('');
@@ -78,15 +80,31 @@ export default function EventDetailModal({
     const trimmed = name.trim();
     if (!trimmed) return;
     if (attendees.includes(trimmed)) { alert('이미 등록된 참석자입니다.'); return; }
+
+    const password = prompt("참석 취소 시 본인 확인용으로 사용할 비밀번호를 입력해주세요:");
+    if (password === null) return;
+    const trimmedPwd = password.trim();
+    if (!trimmedPwd) {
+      alert("비밀번호는 필수 입력 사항입니다.");
+      return;
+    }
+
     localStorage.setItem('lastAttendeeName', trimmed);
     setSavedMyName(trimmed);
-    await onAddAttendee(event.id, trimmed);
+    await onAddAttendee(event.id, trimmed, trimmedPwd);
     setNewName('');
   };
 
   const handleRemoveAttendee = async (name: string) => {
-    if (!window.confirm(`"${name}" 님을 참석자에서 제외하시겠습니까?`)) return;
-    await onRemoveAttendee(event.id, name);
+    const password = prompt("참석 취소를 완료하려면 등록 시 입력했던 비밀번호를 입력해주세요:");
+    if (password === null) return;
+    const trimmedPwd = password.trim();
+    
+    try {
+      await onRemoveAttendee(event.id, name, trimmedPwd);
+    } catch (err: any) {
+      alert(err.message || '참석 취소에 실패했습니다.');
+    }
   };
 
   const formatKoreanDate = (dateStr: string) => {
@@ -137,22 +155,26 @@ export default function EventDetailModal({
             <span className="text-xs font-semibold text-muted-foreground">일정 상세</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <button
-              onClick={handleDeleteClick}
-              type="button"
-              className="w-8 h-8 rounded-full hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition cursor-pointer text-muted-foreground border border-border/30"
-              title="일정 삭제"
-            >
-              <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
-            </button>
-            <button
-              onClick={handleEditClick}
-              type="button"
-              className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center transition cursor-pointer text-muted-foreground hover:text-foreground border border-border/30"
-              title="일정 수정"
-            >
-              <Edit2 className="w-3.5 h-3.5" strokeWidth={2} />
-            </button>
+            {isAdminMode && (
+              <>
+                <button
+                  onClick={handleDeleteClick}
+                  type="button"
+                  className="w-8 h-8 rounded-full hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition cursor-pointer text-muted-foreground border border-border/30"
+                  title="일정 삭제"
+                >
+                  <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
+                </button>
+                <button
+                  onClick={handleEditClick}
+                  type="button"
+                  className="w-8 h-8 rounded-full hover:bg-muted flex items-center justify-center transition cursor-pointer text-muted-foreground hover:text-foreground border border-border/30"
+                  title="일정 수정"
+                >
+                  <Edit2 className="w-3.5 h-3.5" strokeWidth={2} />
+                </button>
+              </>
+            )}
             <button
               onClick={handleCopyLink}
               type="button"

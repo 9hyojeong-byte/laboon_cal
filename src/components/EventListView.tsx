@@ -11,6 +11,7 @@ interface EventListViewProps {
   onEventClick: (event: ScheduleEvent) => void;
   onSelectDate: (dateStr: string) => void;
   searchQuery?: string;
+  isAdminMode?: boolean;
 }
 
 const stickerColors = [
@@ -353,6 +354,7 @@ export default function EventListView({
   onEventClick,
   onSelectDate,
   searchQuery,
+  isAdminMode = false,
 }: EventListViewProps) {
   // 1. 데이터 준비 (필터링 및 정렬)
   let displayEvents: ScheduleEvent[] = [];
@@ -432,13 +434,15 @@ export default function EventListView({
             </button>
           )}
         </div>
-        <button
-          onClick={onAddEventClick}
-          className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-accent to-accent-secondary text-white text-xs font-semibold rounded-xl shadow-sm hover:-translate-y-0.5 hover:shadow-accent active:scale-[0.98] transition-all duration-200 cursor-pointer"
-        >
-          <Plus className="w-3.5 h-3.5" strokeWidth={2} />
-          <span>추가</span>
-        </button>
+        {isAdminMode && (
+          <button
+            onClick={onAddEventClick}
+            className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-accent to-accent-secondary text-white text-xs font-semibold rounded-xl shadow-sm hover:-translate-y-0.5 hover:shadow-accent active:scale-[0.98] transition-all duration-200 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" strokeWidth={2} />
+            <span>추가</span>
+          </button>
+        )}
       </div>
 
       {/* ── 리스트 영역 ── */}

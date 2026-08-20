@@ -240,7 +240,7 @@ export async function deleteSchedule(id: string): Promise<void> {
 /**
  * Add a participant to the schedule attendees list
  */
-export async function addAttendee(scheduleId: string, nickname: string): Promise<void> {
+export async function addAttendee(scheduleId: string, nickname: string, password?: string): Promise<void> {
   if (!isSupabaseConfigured) {
     const mock = getMockData();
     const idx = mock.findIndex(e => e.id === scheduleId);
@@ -251,6 +251,9 @@ export async function addAttendee(scheduleId: string, nickname: string): Promise
         list.push(nickname);
         ev.attendees = list.join(', ');
         saveMockData(mock);
+        if (password) {
+          localStorage.setItem(`raboon_pwd_${scheduleId}_${nickname}`, password);
+        }
       }
     }
     return;
@@ -261,6 +264,7 @@ export async function addAttendee(scheduleId: string, nickname: string): Promise
     .insert({
       schedule_id: scheduleId,
       nickname: nickname,
+      password_hash: password || null,
     });
 
   if (error) {
@@ -272,8 +276,12 @@ export async function addAttendee(scheduleId: string, nickname: string): Promise
 /**
  * Remove a participant from the schedule attendees list
  */
-export async function removeAttendee(scheduleId: string, nickname: string): Promise<void> {
+export async function removeAttendee(scheduleId: string, nickname: string, password?: string): Promise<void> {
   if (!isSupabaseConfigured) {
+    const storedPwd = localStorage.getItem(`raboon_pwd_${scheduleId}_${nickname}`) || '';
+    if (storedPwd && storedPwd !== password) {
+      throw new Error('비밀번호가 일치하지 않습니다.');
+    }
     const mock = getMockData();
     const idx = mock.findIndex(e => e.id === scheduleId);
     if (idx !== -1) {
@@ -282,8 +290,28 @@ export async function removeAttendee(scheduleId: string, nickname: string): Prom
       const filtered = list.filter(n => n !== nickname);
       ev.attendees = filtered.length > 0 ? filtered.join(', ') : null;
       saveMockData(mock);
+      localStorage.removeItem(`raboon_pwd_${scheduleId}_${nickname}`);
     }
     return;
+  }
+
+  // Fetch the attendee to verify the password_hash first
+  const { data, error: fetchErr } = await supabase
+    .from('schedule_attendees')
+    .select('password_hash')
+    .eq('schedule_id', scheduleId)
+    .eq('nickname', nickname)
+    .maybeSingle();
+
+  if (fetchErr) {
+    console.error('Failed to verify attendee password in Supabase:', fetchErr);
+    throw new Error('참석 정보를 확인하는 과정에서 오류가 발생했습니다.');
+  }
+
+  if (data && data.password_hash) {
+    if (data.password_hash !== password) {
+      throw new Error('비밀번호가 일치하지 않습니다.');
+    }
   }
 
   const { error } = await supabase
