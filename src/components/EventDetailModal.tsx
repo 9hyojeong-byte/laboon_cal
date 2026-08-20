@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Calendar, Clock, MapPin, AlignLeft, Users, UserPlus, Sparkles, Link, Waves, Edit2, Trash2 } from 'lucide-react';
 import { ScheduleEvent } from '../types';
 import { formatTime } from '../lib/timeUtils';
@@ -25,6 +25,17 @@ export default function EventDetailModal({
   const [newName, setNewName] = useState('');
   const [savedMyName, setSavedMyName] = useState('');
   const [showToast, setShowToast] = useState(false);
+  // Guards against handleAddAttendee/handleRemoveAttendee firing twice for
+  // one user action. isSubmittingRef blocks a second call while the first is
+  // still in flight (real concurrent double-click). lastAttendeeActionAtRef
+  // additionally blocks calls arriving within GHOST_CLICK_WINDOW_MS of the
+  // previous call's completion, since Mobile Safari can redeliver the
+  // triggering tap as a "ghost click" right after a native alert()/prompt()/
+  // confirm() closes -- that repeat lands *after* the first call has already
+  // finished, so isSubmittingRef alone wouldn't catch it.
+  const isSubmittingRef = useRef(false);
+  const lastAttendeeActionAtRef = useRef(0);
+  const GHOST_CLICK_WINDOW_MS = 600;
 
   const handleCopyLink = async () => {
     const formattedDate = event.endDate
@@ -77,39 +88,58 @@ export default function EventDetailModal({
   const attendees = getAttendeesList();
 
   const handleAddAttendee = async (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    if (attendees.includes(trimmed)) { alert('이미 등록된 참석자입니다.'); return; }
+    const now = Date.now();
+    if (isSubmittingRef.current || now - lastAttendeeActionAtRef.current < GHOST_CLICK_WINDOW_MS) return;
+    isSubmittingRef.current = true;
 
-    const password = prompt("참석 취소 시 본인 확인용으로 사용할 비밀번호를 입력해주세요:");
-    if (password === null) return;
-    const trimmedPwd = password.trim();
-    if (!trimmedPwd) {
-      alert("비밀번호는 필수 입력 사항입니다.");
-      return;
+    try {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      if (attendees.includes(trimmed)) { alert('이미 등록된 참석자입니다.'); return; }
+
+      const password = prompt("참석 취소 시 본인 확인용으로 사용할 비밀번호를 입력해주세요:");
+      if (password === null) return;
+      const trimmedPwd = password.trim();
+      if (!trimmedPwd) {
+        alert("비밀번호는 필수 입력 사항입니다.");
+        return;
+      }
+
+      localStorage.setItem('lastAttendeeName', trimmed);
+      setSavedMyName(trimmed);
+      await onAddAttendee(event.id, trimmed, trimmedPwd);
+      setNewName('');
+    } finally {
+      isSubmittingRef.current = false;
+      // Recorded at the end (not the start) so a ghost click that fires the
+      // instant a dialog above closes is measured against "just now", not
+      // against how long the user spent looking at the dialog.
+      lastAttendeeActionAtRef.current = Date.now();
     }
-
-    localStorage.setItem('lastAttendeeName', trimmed);
-    setSavedMyName(trimmed);
-    await onAddAttendee(event.id, trimmed, trimmedPwd);
-    setNewName('');
   };
 
   const handleRemoveAttendee = async (name: string) => {
-    let trimmedPwd: string | undefined;
-
-    if (isAdminMode) {
-      if (!window.confirm(`"${name}" 참석자를 삭제하시겠습니까?`)) return;
-    } else {
-      const password = prompt("참석 취소를 완료하려면 등록 시 입력했던 비밀번호를 입력해주세요:");
-      if (password === null) return;
-      trimmedPwd = password.trim();
-    }
+    const now = Date.now();
+    if (isSubmittingRef.current || now - lastAttendeeActionAtRef.current < GHOST_CLICK_WINDOW_MS) return;
+    isSubmittingRef.current = true;
 
     try {
+      let trimmedPwd: string | undefined;
+
+      if (isAdminMode) {
+        if (!window.confirm(`"${name}" 참석자를 삭제하시겠습니까?`)) return;
+      } else {
+        const password = prompt("참석 취소를 완료하려면 등록 시 입력했던 비밀번호를 입력해주세요:");
+        if (password === null) return;
+        trimmedPwd = password.trim();
+      }
+
       await onRemoveAttendee(event.id, name, trimmedPwd, isAdminMode);
     } catch (err: any) {
       alert(err.message || '참석 취소에 실패했습니다.');
+    } finally {
+      isSubmittingRef.current = false;
+      lastAttendeeActionAtRef.current = Date.now();
     }
   };
 
