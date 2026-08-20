@@ -9,6 +9,7 @@ interface EventFormProps {
   editingEvent: ScheduleEvent | null;
   onSave: (event: Omit<ScheduleEvent, 'createdAt'>) => void;
   onCancel: () => void;
+  defaultGatheringType?: string;
 }
 
 const LOCATIONS = ['딥스', '파라', '밀양', '북항', '패나', '풀6', '두류', '문수', '알프스', '자유일정'] as const;
@@ -119,7 +120,7 @@ const adjustTitleForSpecialEntry = (currentTitle: string, deepTank: string | nul
   return parts.join('/');
 };
 
-export default function EventForm({ selectedDate, editingEvent, onSave, onCancel }: EventFormProps) {
+export default function EventForm({ selectedDate, editingEvent, onSave, onCancel, defaultGatheringType }: EventFormProps) {
   const [author, setAuthor] = useState('');
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
@@ -193,7 +194,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
     } else {
       setDate(selectedDate); setEndDate(selectedDate); setLocation('딥스');
       setIsAllDay(false); setSession('1부'); setHour('12시'); setDeepTankUsage(null); setDescription('');
-      setCompany(''); setGatheringType('트레이닝');
+      setCompany(''); setGatheringType(defaultGatheringType || '트레이닝');
       setAuthor(savedName);
       setEarlyLateEntry(true);
 
@@ -201,7 +202,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
       const initialTitle = buildAutoTitle(initialAuthor, '딥스', '1부', '12시', null, false, true);
       setTitle(initialTitle);
     }
-  }, [editingEvent, selectedDate]);
+  }, [editingEvent, selectedDate, defaultGatheringType]);
 
   const handleDeepTankClick = (option: string) => {
     let nextUsage: string | null = null;

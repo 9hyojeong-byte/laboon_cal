@@ -530,6 +530,7 @@ export default function App() {
             editingEvent={editingEvent}
             onSave={handleSaveEvent}
             onCancel={() => { setIsFormOpen(false); setEditingEvent(null); }}
+            defaultGatheringType={TAB_GROUPS[activeTab][0]}
           />
         )}
 
