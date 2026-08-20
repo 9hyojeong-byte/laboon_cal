@@ -427,11 +427,10 @@ export default function App() {
               {!isStandalone && (
                 <button
                   onClick={handleInstall}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50 text-[10.5px] font-sans font-bold text-[#1E40AF] hover:bg-blue-100 hover:border-blue-300 transition-all duration-150 cursor-pointer shadow-sm active:scale-95"
+                  className="w-9 h-9 rounded-xl border border-blue-200 bg-blue-50 flex items-center justify-center hover:bg-blue-100 hover:border-blue-300 transition-all duration-150 cursor-pointer shadow-sm active:scale-95"
                   title="앱 다운로드하기"
                 >
-                  <Download className="w-3.5 h-3.5 text-blue-600" strokeWidth={3} />
-                  <span>다운로드</span>
+                  <Download className="w-4 h-4 text-blue-600" strokeWidth={2.5} />
                 </button>
               )}
             </div>
