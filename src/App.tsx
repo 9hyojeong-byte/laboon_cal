@@ -487,15 +487,17 @@ export default function App() {
         </main>
 
         {/* ── Floating Add Button (Minimal Modern Style) ── */}
-        <div className="absolute bottom-6 right-5 z-40">
-          <button
-            onClick={() => { setEditingEvent(null); setIsFormOpen(true); }}
-            className="w-14 h-14 bg-gradient-to-r from-accent to-accent-secondary text-white rounded-full shadow-accent hover:-translate-y-1 hover:shadow-accent-lg active:scale-[0.96] flex items-center justify-center transition-all duration-200 cursor-pointer"
-            title="일정 추가"
-          >
-            <Plus className="w-6 h-6" strokeWidth={2} />
-          </button>
-        </div>
+        {isAdminMode && (
+          <div className="absolute bottom-6 right-5 z-40">
+            <button
+              onClick={() => { setEditingEvent(null); setIsFormOpen(true); }}
+              className="w-14 h-14 bg-gradient-to-r from-accent to-accent-secondary text-white rounded-full shadow-accent hover:-translate-y-1 hover:shadow-accent-lg active:scale-[0.96] flex items-center justify-center transition-all duration-200 cursor-pointer"
+              title="일정 추가"
+            >
+              <Plus className="w-6 h-6" strokeWidth={2} />
+            </button>
+          </div>
+        )}
 
         {/* ── Event Form Modal ── */}
         {isFormOpen && (
