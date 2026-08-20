@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Edit2, Trash2, Plus, Settings, X, CalendarDays, Link } from 'lucide-react';
 import { ScheduleEvent } from '../types';
 import { formatTime, isPastDate } from '../lib/timeUtils';
+import { getSessionTimeRange, formatLocationName } from '../lib/locationSessions';
 
 interface EventListViewProps {
   selectedDate: string;
@@ -73,17 +74,6 @@ const getBuoyTimes = (sess: string) => {
   return mapping[sess] || { early: '7:30', late: '8:30' };
 };
 
-const getSessionTimeRange = (sess: string) => {
-  const ranges: Record<string, string> = {
-    '1부': '8:00~11:00',
-    '2부': '11:00~14:00',
-    '3부': '14:00~17:00',
-    '4부': '17:00~20:00',
-    '5부': '20:00~23:00',
-  };
-  return ranges[sess] || '';
-};
-
 const formatScreenshotStyleDate = (dateStr: string) => {
   try {
     const parts = dateStr.split('-');
@@ -126,14 +116,6 @@ const getBuoyDetailText = (sess: string, buoy: string) => {
   return '';
 };
 
-const formatLocationName = (loc: string | undefined | null) => {
-  if (!loc) return '일반';
-  const trimmed = loc.trim();
-  if (trimmed === '딥스') return '딥스테이션';
-  if (trimmed === '파라') return '파라다이브';
-  return trimmed;
-};
-
 function EventCard({
   ev,
   colorIdx,
@@ -156,8 +138,13 @@ function EventCard({
   const locationColors: Record<string, string> = {
     '딥스':   'bg-blue-50 border-blue-100 text-blue-650 font-bold',
     '파라':   'bg-red-50 border-red-100 text-red-650 font-bold',
-    '성남':   'bg-emerald-50 border-emerald-100 text-emerald-650 font-bold',
-    '수원':   'bg-orange-50 border-orange-100 text-orange-650 font-bold',
+    '밀양':   'bg-teal-50 border-teal-100 text-teal-650 font-bold',
+    '북항':   'bg-cyan-50 border-cyan-100 text-cyan-650 font-bold',
+    '패나':   'bg-fuchsia-50 border-fuchsia-100 text-fuchsia-650 font-bold',
+    '풀6':    'bg-lime-50 border-lime-100 text-lime-650 font-bold',
+    '두류':   'bg-amber-50 border-amber-100 text-amber-650 font-bold',
+    '문수':   'bg-rose-50 border-rose-100 text-rose-650 font-bold',
+    '알프스': 'bg-indigo-50 border-indigo-100 text-indigo-650 font-bold',
     '자유일정':'bg-violet-50 border-violet-100 text-violet-650 font-bold',
   };
   const locColor = locationColors[ev.location || ''] || 'bg-slate-50 border-slate-100 text-slate-500';
@@ -223,7 +210,7 @@ function EventCard({
       ? (isLate ? `${buoyTimes.late} 늦은입장` : '정시 입장')
       : '';
 
-  const timeRange = ev.startTime ? getSessionTimeRange(ev.startTime) : '';
+  const timeRange = ev.startTime ? getSessionTimeRange(ev.location, ev.startTime) : '';
   const sessionText = ev.startTime 
     ? (timeRange ? `${ev.startTime} · ${timeRange}` : ev.startTime)
     : '하루종일';

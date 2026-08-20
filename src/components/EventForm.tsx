@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar, Clock, AlignLeft, Check, MapPin, User, Waves } from 'lucide-react';
 import { ScheduleEvent } from '../types';
 import { formatTime, normalizeToHourLabel } from '../lib/timeUtils';
+import { LOCATION_SESSIONS, SESSION_TIME_RANGES } from '../lib/locationSessions';
 
 interface EventFormProps {
   selectedDate: string;
@@ -10,9 +11,8 @@ interface EventFormProps {
   onCancel: () => void;
 }
 
-const LOCATIONS = ['딥스', '성남', '파라', '수원', '자유일정'] as const;
+const LOCATIONS = ['딥스', '파라', '밀양', '북항', '패나', '풀6', '두류', '문수', '알프스', '자유일정'] as const;
 type LocationType = typeof LOCATIONS[number];
-const SESSIONS = ['1부', '2부', '3부', '4부', '5부'] as const;
 const HOURS = Array.from({ length: 24 }, (_, i) => `${i}시`);
 const GATHERING_TYPES = ['트레이닝', '같이가요', '교육', '투어', '기타'] as const;
 
@@ -68,7 +68,7 @@ function buildAutoTitle(
   }
   parts.push(loc);
 
-  const timeStr = allDay ? '하루종일' : (loc === '딥스' || loc === '파라' ? sess : hr);
+  const timeStr = allDay ? '하루종일' : (loc !== '자유일정' ? sess : hr);
   parts.push(timeStr);
 
   if (!allDay && (loc === '딥스' || loc === '파라') && deepTank) {
@@ -170,24 +170,24 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
         detLocation = editingEvent.location as LocationType;
       } else {
         const fullText = `${editingEvent.title} ${editingEvent.description || ''}`;
-        if (fullText.includes('성남')) detLocation = '성남';
-        else if (fullText.includes('파라')) detLocation = '파라';
-        else if (fullText.includes('수원')) detLocation = '수원';
+        const matched = LOCATIONS.find((loc) => loc !== '자유일정' && fullText.includes(loc));
+        if (matched) detLocation = matched;
         else if (fullText.includes('자유일정')) detLocation = '자유일정';
       }
       setLocation(detLocation);
 
       const isDayAll = !editingEvent.startTime;
       setIsAllDay(isDayAll);
+      const sessionsForLocation = LOCATION_SESSIONS[detLocation] || [];
       if (!isDayAll && editingEvent.startTime) {
         const raw = editingEvent.startTime;
-        if (detLocation === '딥스' || detLocation === '파라') {
-          setSession(SESSIONS.includes(raw as any) ? raw : '1부');
+        if (detLocation !== '자유일정') {
+          setSession(sessionsForLocation.includes(raw) ? raw : sessionsForLocation[0] || '1부');
         } else {
           setHour(normalizeToHourLabel(raw));
         }
       } else {
-        setSession('1부');
+        setSession(sessionsForLocation[0] || '1부');
         setHour('12시');
       }
     } else {
@@ -273,7 +273,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
 
     let finalStartTime: string | null = null;
     if (!isAllDay) {
-      if (location === '딥스' || location === '파라') {
+      if (location !== '자유일정') {
         finalStartTime = session;
       } else {
         const hNum = parseInt(hour.replace('시', ''), 10);
@@ -377,14 +377,14 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
                     type="button"
                     onClick={() => {
                       setLocation(loc);
-                      if (loc === '딥스' || loc === '파라') {
-                        setSession('1부');
+                      if (loc !== '자유일정') {
+                        setSession(LOCATION_SESSIONS[loc]?.[0] || '1부');
+                        setEndDate(date);
                       } else {
                         setHour('12시');
-                        setDeepTankUsage(null);
                       }
-                      if (loc !== '자유일정') {
-                        setEndDate(date);
+                      if (loc !== '딥스' && loc !== '파라') {
+                        setDeepTankUsage(null);
                       }
                     }}
                     className={`px-3 py-1.5 text-[11px] font-semibold rounded-full border transition cursor-pointer duration-150
@@ -445,20 +445,20 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
           {!isAllDay && (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                {location === '딥스' || location === '파라' ? (
+                {location !== '자유일정' ? (
                   <>
                     <label className="text-[10px] font-mono font-semibold text-muted-foreground uppercase tracking-wider">
                       시간 (부 선택) *
                     </label>
-                    <div className="flex gap-1.5">
-                      {SESSIONS.map((sess) => {
+                    <div className="flex gap-1.5 flex-wrap">
+                      {(LOCATION_SESSIONS[location] || []).map((sess) => {
                         const isActive = session === sess;
                         return (
                           <button
                             key={sess}
                             type="button"
                             onClick={() => setSession(sess)}
-                            className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition cursor-pointer duration-155
+                            className={`px-3.5 py-2 text-xs font-semibold rounded-xl border transition cursor-pointer duration-155
                               ${isActive
                                 ? 'bg-accent border-accent text-white shadow-sm'
                                 : 'bg-card border-border text-muted-foreground hover:bg-muted'}`}
@@ -468,6 +468,11 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
                         );
                       })}
                     </div>
+                    {SESSION_TIME_RANGES[location]?.[session] && (
+                      <p className="text-[10.5px] text-muted-foreground font-medium pl-0.5">
+                        {SESSION_TIME_RANGES[location][session]}
+                      </p>
+                    )}
                   </>
                 ) : (
                   <>
