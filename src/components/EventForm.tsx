@@ -3,6 +3,7 @@ import { X, Calendar, Clock, AlignLeft, Check, MapPin, User, Waves } from 'lucid
 import { ScheduleEvent } from '../types';
 import { formatTime, normalizeToHourLabel } from '../lib/timeUtils';
 import { LOCATION_SESSIONS, SESSION_TIME_RANGES } from '../lib/locationSessions';
+import { COMPANY_CODE } from '../lib/supabaseApi';
 
 interface EventFormProps {
   selectedDate: string;
@@ -294,7 +295,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
       description: description.trim() || null,
       location,
       attendees: combinedAttendees,
-      company: editingEvent ? (editingEvent.company || 'laboon01') : 'laboon01',
+      company: editingEvent ? (editingEvent.company || COMPANY_CODE) : COMPANY_CODE,
       gatheringType: gatheringType || null,
     });
   };

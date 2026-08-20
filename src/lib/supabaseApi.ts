@@ -7,6 +7,9 @@ const isSupabaseConfigured = !!(
 
 const LOCAL_STORAGE_KEY = 'raboon_supabase_fallback_schedules';
 
+// Only schedules belonging to this company code are fetched/shown in this app.
+export const COMPANY_CODE = 'laboon01';
+
 // Initialize mock data for fallback
 const getMockData = (): ScheduleEvent[] => {
   const data = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -16,15 +19,15 @@ const getMockData = (): ScheduleEvent[] => {
   const defaultMock: ScheduleEvent[] = [
     {
       id: 'mock-1',
-      title: '범고래/성남/12시/트레이닝',
+      title: '범고래/딥스/12시/트레이닝',
       date: new Date().toISOString().split('T')[0],
       startTime: '12:00',
       endTime: '15:00',
       description: '버디 구함. 라이선스 소지자만!',
-      location: '성남',
+      location: '딥스',
       deepTankUsage: null,
       attendees: '범고래, 아쿠아, 마린',
-      company: '성남아쿠아라인',
+      company: COMPANY_CODE,
       gatheringType: '트레이닝',
       createdAt: new Date().toISOString()
     }
@@ -43,7 +46,7 @@ const saveMockData = (events: ScheduleEvent[]) => {
 export async function fetchSchedules(): Promise<ScheduleEvent[]> {
   if (!isSupabaseConfigured) {
     console.log('Using LocalStorage fallback database');
-    return getMockData();
+    return getMockData().filter(e => e.company === COMPANY_CODE);
   }
 
   const { data, error } = await supabase
@@ -55,6 +58,7 @@ export async function fetchSchedules(): Promise<ScheduleEvent[]> {
       )
     `)
     .is('deleted_at', null)
+    .eq('company', COMPANY_CODE)
     .order('start_date', { ascending: true });
 
   if (error) {
