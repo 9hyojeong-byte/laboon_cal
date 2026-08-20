@@ -50,7 +50,7 @@ export default function App() {
       alert("관리자 모드가 해제되었습니다.");
     } else {
       const val = prompt("관리자 비밀번호를 입력해주세요:");
-      if (val === 'laboon01') {
+      if (val === '890817') {
         setIsAdminMode(true);
         alert("관리자 모드가 활성화되었습니다. 이제 일정 추가/수정/삭제가 가능합니다.");
       } else if (val !== null) {
@@ -383,9 +383,9 @@ export default function App() {
           <div className="relative flex justify-between items-center">
             {/* Title block */}
             <div className="flex flex-col">
-              <h1 className="font-display text-[26px] tracking-tight text-foreground leading-none flex items-center gap-1.5 select-none">
-                <span>라분다이브 <span className="gradient-text font-display">캘린더</span></span>
-                <button 
+              <h1 className="flex items-center gap-1.5 select-none">
+                <img src="/logo/laboon_logo_long.png" alt="Laboon Dive" className="h-6 w-auto" />
+                <button
                   onClick={handleToggleAdminMode}
                   className={`transition-all duration-200 cursor-pointer p-1 rounded-lg border ${isAdminMode ? 'text-accent border-accent/20 bg-accent/5' : 'text-muted-foreground/30 border-transparent hover:text-accent hover:border-accent/10 hover:bg-accent/5'}`}
                   title={isAdminMode ? '관리자 모드 활성화됨 (클릭 시 해제)' : '관리자 로그인'}
