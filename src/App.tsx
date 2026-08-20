@@ -488,7 +488,7 @@ export default function App() {
 
         {/* ── Floating Add Button (Minimal Modern Style) ── */}
         {isAdminMode && (
-          <div className="absolute bottom-6 right-5 z-40">
+          <div className="fixed sm:absolute bottom-6 right-5 z-40">
             <button
               onClick={() => { setEditingEvent(null); setIsFormOpen(true); }}
               className="w-14 h-14 bg-gradient-to-r from-accent to-accent-secondary text-white rounded-full shadow-accent hover:-translate-y-1 hover:shadow-accent-lg active:scale-[0.96] flex items-center justify-center transition-all duration-200 cursor-pointer"
