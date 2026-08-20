@@ -2,7 +2,6 @@ import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ScheduleEvent } from '../types';
 import { isPastDate } from '../lib/timeUtils';
-import { getDotColorClass } from '../lib/locationColors';
 
 interface CalendarViewProps {
   currentDate: Date;
@@ -22,6 +21,11 @@ const GATHERING_TYPE_COLORS: Record<string, { dot: string; bg: string; text: str
   '투어': { dot: 'bg-violet-500', bg: 'bg-violet-50/70', text: 'text-violet-700', border: 'border-violet-200/50' },
   '기타': { dot: 'bg-slate-400', bg: 'bg-slate-50/70', text: 'text-slate-655', border: 'border-slate-200/50' },
 };
+
+function getGatheringTypeDotClass(type: string | null | undefined): string {
+  if (!type) return 'bg-slate-400';
+  return GATHERING_TYPE_COLORS[type]?.dot || 'bg-slate-400';
+}
 
 function formatLocalDate(date: Date): string {
   const y = date.getFullYear();
@@ -198,7 +202,7 @@ export default function CalendarView({
                             ? 'bg-accent'
                             : isPastDate(dateStr)
                               ? 'bg-slate-300'
-                              : getDotColorClass(ev.location)}`}
+                              : getGatheringTypeDotClass(ev.gatheringType)}`}
                     />
                   ))}
                 </div>
