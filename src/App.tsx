@@ -383,14 +383,7 @@ export default function App() {
           <div className="relative flex justify-between items-center">
             {/* Title block */}
             <div className="flex flex-col">
-              {/* Section badge pattern */}
-              <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/5 px-3 py-1 self-start">
-                <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse-dot" />
-                <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-accent">
-                  Gathering Planner
-                </span>
-              </div>
-              <h1 className="font-display text-[26px] tracking-tight text-foreground leading-none mt-1 flex items-center gap-1.5 select-none">
+              <h1 className="font-display text-[26px] tracking-tight text-foreground leading-none flex items-center gap-1.5 select-none">
                 <span>라분다이브 <span className="gradient-text font-display">캘린더</span></span>
                 <button 
                   onClick={handleToggleAdminMode}
