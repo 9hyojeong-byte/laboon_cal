@@ -174,11 +174,8 @@ export default function EventDetailModal({
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
 
-          {/* Title Card */}
-          <div className="bg-card rounded-2xl border border-border shadow-sm p-4 space-y-3">
-            <h2 className="font-display text-xl font-medium text-foreground leading-snug break-all">
-              {event.title}
-            </h2>
+          {/* Badges and details card */}
+          <div className="bg-card rounded-2xl border border-border shadow-sm p-4">
             <div className="flex flex-wrap gap-1.5">
               <div className="flex items-center gap-1.5 bg-muted/65 px-3 py-1 rounded-full border border-border/80 text-[11px] font-medium text-muted-foreground font-mono">
                 <Calendar className="w-3.5 h-3.5 text-muted-foreground/60" strokeWidth={1.5} />
