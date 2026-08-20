@@ -15,11 +15,18 @@ import {
 } from './lib/supabaseApi';
 import { supabase } from './lib/supabaseClient';
 
+const TAB_GROUPS: Record<string, string[]> = {
+  '다이빙 교육': ['교육'],
+  '트레이닝/벙/투어': ['트레이닝', '같이가요', '투어', '기타'],
+};
+const TAB_NAMES = Object.keys(TAB_GROUPS);
+
 export default function App() {
   const [events, setEvents] = useState<ScheduleEvent[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [currentCalendarDate, setCurrentCalendarDate] = useState<Date>(new Date());
   const [selectedGatheringType, setSelectedGatheringType] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>(TAB_NAMES[0]);
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchVal, setSearchVal] = useState('');
@@ -353,7 +360,11 @@ export default function App() {
   };
 
   const filteredEvents = events.filter(e => {
-    if (selectedGatheringType && (!e.gatheringType || e.gatheringType !== selectedGatheringType)) {
+    const eventType = e.gatheringType || '기타';
+    if (!TAB_GROUPS[activeTab].includes(eventType)) {
+      return false;
+    }
+    if (selectedGatheringType && eventType !== selectedGatheringType) {
       return false;
     }
     if (searchQuery.trim()) {
@@ -384,7 +395,7 @@ export default function App() {
             {/* Title block */}
             <div className="flex flex-col">
               <h1 className="flex items-center gap-1.5 select-none">
-                <img src="/logo/laboon_logo_long.png" alt="Laboon Dive" className="h-6 w-auto" />
+                <img src="/logo/laboon_logo_new_long.png" alt="Laboon Dive" className="h-6 w-auto" />
                 <button
                   onClick={handleToggleAdminMode}
                   className={`transition-all duration-200 cursor-pointer p-1 rounded-lg border ${isAdminMode ? 'text-accent border-accent/20 bg-accent/5' : 'text-muted-foreground/30 border-transparent hover:text-accent hover:border-accent/10 hover:bg-accent/5'}`}
@@ -457,6 +468,26 @@ export default function App() {
 
         {/* ── Main content (Scrollable) ── */}
         <main className="flex-1 overflow-y-auto p-5 space-y-6">
+          {/* ── Category Tabs ── */}
+          <div className="flex items-center gap-1 bg-muted/65 p-1 rounded-2xl border border-border/80">
+            {TAB_NAMES.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => {
+                  setActiveTab(tab);
+                  setSelectedGatheringType(null);
+                }}
+                className={`flex-1 px-3 py-2 rounded-xl text-[12px] font-bold tracking-tight transition-all duration-200 cursor-pointer
+                  ${activeTab === tab
+                    ? 'bg-card text-accent shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
           <CalendarView
             selectedDate={selectedDate}
             currentDate={currentCalendarDate}
@@ -465,6 +496,7 @@ export default function App() {
             onNavigateMonth={handleNavigateMonth}
             selectedGatheringType={selectedGatheringType}
             onSelectGatheringType={setSelectedGatheringType}
+            visibleTypes={TAB_GROUPS[activeTab]}
           />
 
           <EventListView

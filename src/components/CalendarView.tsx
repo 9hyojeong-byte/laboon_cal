@@ -12,6 +12,7 @@ interface CalendarViewProps {
   onNavigateMonth: (offset: number) => void;
   selectedGatheringType: string | null;
   onSelectGatheringType: (type: string | null) => void;
+  visibleTypes?: string[];
 }
 
 const GATHERING_TYPE_COLORS: Record<string, { dot: string; bg: string; text: string; border: string }> = {
@@ -37,6 +38,7 @@ export default function CalendarView({
   onNavigateMonth,
   selectedGatheringType,
   onSelectGatheringType,
+  visibleTypes,
 }: CalendarViewProps) {
   const legendRef = React.useRef<HTMLDivElement>(null);
 
@@ -207,11 +209,12 @@ export default function CalendarView({
       </div>
 
       {/* ── Legend (Gathering Types Filter) ── */}
-      <div 
+      {visibleTypes && visibleTypes.length > 1 && (
+      <div
         ref={legendRef}
         className="mt-4 pt-4 border-t border-border flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5"
       >
-        {Object.entries(GATHERING_TYPE_COLORS).map(([type, colors]) => {
+        {Object.entries(GATHERING_TYPE_COLORS).filter(([type]) => visibleTypes.includes(type)).map(([type, colors]) => {
           const isActive = selectedGatheringType === type;
           const isAnyActive = selectedGatheringType !== null;
           return (
@@ -239,6 +242,7 @@ export default function CalendarView({
           );
         })}
       </div>
+      )}
     </div>
   );
 }
