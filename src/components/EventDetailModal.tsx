@@ -7,7 +7,7 @@ interface EventDetailModalProps {
   event: ScheduleEvent;
   onClose: () => void;
   onAddAttendee: (scheduleId: string, nickname: string, password?: string) => Promise<void>;
-  onRemoveAttendee: (scheduleId: string, nickname: string, password?: string) => Promise<void>;
+  onRemoveAttendee: (scheduleId: string, nickname: string, password?: string, isAdmin?: boolean) => Promise<void>;
   onEdit: (event: ScheduleEvent) => void;
   onDelete: (id: string) => void;
   isAdminMode?: boolean;
@@ -96,12 +96,18 @@ export default function EventDetailModal({
   };
 
   const handleRemoveAttendee = async (name: string) => {
-    const password = prompt("참석 취소를 완료하려면 등록 시 입력했던 비밀번호를 입력해주세요:");
-    if (password === null) return;
-    const trimmedPwd = password.trim();
-    
+    let trimmedPwd: string | undefined;
+
+    if (isAdminMode) {
+      if (!window.confirm(`"${name}" 참석자를 삭제하시겠습니까?`)) return;
+    } else {
+      const password = prompt("참석 취소를 완료하려면 등록 시 입력했던 비밀번호를 입력해주세요:");
+      if (password === null) return;
+      trimmedPwd = password.trim();
+    }
+
     try {
-      await onRemoveAttendee(event.id, name, trimmedPwd);
+      await onRemoveAttendee(event.id, name, trimmedPwd, isAdminMode);
     } catch (err: any) {
       alert(err.message || '참석 취소에 실패했습니다.');
     }

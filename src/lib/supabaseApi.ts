@@ -276,10 +276,10 @@ export async function addAttendee(scheduleId: string, nickname: string, password
 /**
  * Remove a participant from the schedule attendees list
  */
-export async function removeAttendee(scheduleId: string, nickname: string, password?: string): Promise<void> {
+export async function removeAttendee(scheduleId: string, nickname: string, password?: string, isAdmin?: boolean): Promise<void> {
   if (!isSupabaseConfigured) {
     const storedPwd = localStorage.getItem(`raboon_pwd_${scheduleId}_${nickname}`) || '';
-    if (storedPwd && storedPwd !== password) {
+    if (!isAdmin && storedPwd && storedPwd !== password) {
       throw new Error('비밀번호가 일치하지 않습니다.');
     }
     const mock = getMockData();
@@ -308,7 +308,7 @@ export async function removeAttendee(scheduleId: string, nickname: string, passw
     throw new Error('참석 정보를 확인하는 과정에서 오류가 발생했습니다.');
   }
 
-  if (data && data.password_hash) {
+  if (!isAdmin && data && data.password_hash) {
     if (data.password_hash !== password) {
       throw new Error('비밀번호가 일치하지 않습니다.');
     }

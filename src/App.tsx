@@ -294,7 +294,7 @@ export default function App() {
     }
   };
 
-  const handleRemoveAttendeeFromEvent = async (scheduleId: string, nickname: string, password?: string) => {
+  const handleRemoveAttendeeFromEvent = async (scheduleId: string, nickname: string, password?: string, isAdmin?: boolean) => {
     const previousEvents = [...events];
     const previousSelectedEvent = selectedEventForDetail;
 
@@ -323,7 +323,7 @@ export default function App() {
 
     // 2. Perform DB write quietly in the background
     try {
-      await removeAttendee(scheduleId, nickname, password);
+      await removeAttendee(scheduleId, nickname, password, isAdmin);
       const loadedEvents = await fetchSchedules();
       setEvents(loadedEvents);
       const matched = loadedEvents.find(e => String(e.id) === String(scheduleId));
