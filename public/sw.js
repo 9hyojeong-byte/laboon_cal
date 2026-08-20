@@ -1,10 +1,13 @@
-const CACHE_NAME = 'laboon-cal-v1';
+const CACHE_NAME = 'laboon-cal-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
   'https://fonts.googleapis.com/css2?family=Jua&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap',
-  'https://raw.githubusercontent.com/9hyojeong-byte/files/refs/heads/main/icons/icon_toto_margin.png'
+  '/logo/icons/favicon.ico',
+  '/logo/icons/icon-192.png',
+  '/logo/icons/icon-512.png',
+  '/logo/icons/apple-touch-icon.png'
 ];
 
 self.addEventListener('install', (e) => {
