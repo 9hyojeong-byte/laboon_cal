@@ -49,17 +49,19 @@ export default function App() {
     setIsStandalone(!!checkStandalone);
   }, []);
 
-  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [isAdminMode, setIsAdminMode] = useState(() => localStorage.getItem('isAdminMode') === 'true');
 
   const handleToggleAdminMode = () => {
     if (isAdminMode) {
       setIsAdminMode(false);
+      localStorage.removeItem('isAdminMode');
       alert("관리자 모드가 해제되었습니다.");
     } else {
       const val = prompt("관리자 비밀번호를 입력해주세요:");
       if (val === '890817') {
         setIsAdminMode(true);
-        alert("관리자 모드가 활성화되었습니다. 이제 일정 추가/수정/삭제가 가능합니다.");
+        localStorage.setItem('isAdminMode', 'true');
+        alert("관리자 모드가 활성화되었습니다. 이제 일정 추가/수정/삭제가 가능합니다. 이 기기에서는 다음에 다시 로그인하지 않아도 됩니다.");
       } else if (val !== null) {
         alert("비밀번호가 일치하지 않습니다.");
       }
