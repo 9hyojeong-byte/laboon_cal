@@ -2,6 +2,7 @@ import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ScheduleEvent } from '../types';
 import { isPastDate } from '../lib/timeUtils';
+import { GATHERING_TYPE_COLORS, getGatheringTypeDotClass } from '../lib/gatheringTypeColors';
 
 interface CalendarViewProps {
   currentDate: Date;
@@ -14,24 +15,85 @@ interface CalendarViewProps {
   visibleTypes?: string[];
 }
 
-const GATHERING_TYPE_COLORS: Record<string, { dot: string; bg: string; text: string; border: string }> = {
-  '트레이닝': { dot: 'bg-sky-500', bg: 'bg-sky-50/70', text: 'text-sky-700', border: 'border-sky-200/50' },
-  '같이가요': { dot: 'bg-rose-500', bg: 'bg-rose-50/70', text: 'text-rose-700', border: 'border-rose-200/50' },
-  '교육': { dot: 'bg-amber-500', bg: 'bg-amber-50/70', text: 'text-amber-700', border: 'border-amber-200/50' },
-  '투어': { dot: 'bg-violet-500', bg: 'bg-violet-50/70', text: 'text-violet-700', border: 'border-violet-200/50' },
-  '기타': { dot: 'bg-slate-400', bg: 'bg-slate-50/70', text: 'text-slate-655', border: 'border-slate-200/50' },
-};
-
-function getGatheringTypeDotClass(type: string | null | undefined): string {
-  if (!type) return 'bg-slate-400';
-  return GATHERING_TYPE_COLORS[type]?.dot || 'bg-slate-400';
-}
-
 function formatLocalDate(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+const isMultiDay = (e: ScheduleEvent): e is ScheduleEvent & { endDate: string } =>
+  !!e.endDate && e.endDate !== e.date;
+
+const MAX_VISIBLE_LANES = 2;
+
+interface CalendarCell {
+  dateStr: string;
+  dayNum: number;
+  isCurrentMonth: boolean;
+}
+
+interface BarSegment {
+  event: ScheduleEvent;
+  startCol: number;
+  endCol: number;
+  continuesLeft: boolean;
+  continuesRight: boolean;
+}
+
+// Greedily packs multi-day events into the fewest lanes such that no two
+// events sharing a lane overlap in date range. The same event always keeps
+// the same lane across every week row it appears in.
+function assignLanes(multiDayEvents: ScheduleEvent[]): Map<string, number> {
+  const sorted = [...multiDayEvents].sort((a, b) => {
+    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+    return (a.endDate as string) < (b.endDate as string) ? 1 : -1;
+  });
+  const laneEndDates: string[] = [];
+  const laneMap = new Map<string, number>();
+
+  for (const ev of sorted) {
+    let lane = laneEndDates.findIndex((endDate) => endDate < ev.date);
+    if (lane === -1) {
+      lane = laneEndDates.length;
+      laneEndDates.push(ev.endDate as string);
+    } else {
+      laneEndDates[lane] = ev.endDate as string;
+    }
+    laneMap.set(ev.id, lane);
+  }
+  return laneMap;
+}
+
+function computeWeekBars(week: CalendarCell[], multiDayEvents: ScheduleEvent[], laneMap: Map<string, number>) {
+  const weekStart = week[0].dateStr;
+  const weekEnd = week[6].dateStr;
+  const lanes: BarSegment[][] = Array.from({ length: MAX_VISIBLE_LANES }, () => []);
+  const overflow = new Array(7).fill(0);
+
+  for (const ev of multiDayEvents) {
+    const evEnd = ev.endDate as string;
+    if (ev.date > weekEnd || evEnd < weekStart) continue;
+
+    const startIdx = week.findIndex((c) => c.dateStr === ev.date);
+    const endIdx = week.findIndex((c) => c.dateStr === evEnd);
+    const segment: BarSegment = {
+      event: ev,
+      startCol: startIdx === -1 ? 0 : startIdx,
+      endCol: endIdx === -1 ? 6 : endIdx,
+      continuesLeft: ev.date < weekStart,
+      continuesRight: evEnd > weekEnd,
+    };
+
+    const lane = laneMap.get(ev.id) ?? MAX_VISIBLE_LANES;
+    if (lane < MAX_VISIBLE_LANES) {
+      lanes[lane].push(segment);
+    } else {
+      for (let c = segment.startCol; c <= segment.endCol; c++) overflow[c]++;
+    }
+  }
+
+  return { lanes, overflow };
 }
 
 export default function CalendarView({
@@ -68,7 +130,7 @@ export default function CalendarView({
   const lastDayOfPrevMonth = new Date(year, month, 0);
   const totalDaysPrev = lastDayOfPrevMonth.getDate();
 
-  const calendarCells: { dateStr: string; dayNum: number; isCurrentMonth: boolean }[] = [];
+  const calendarCells: CalendarCell[] = [];
 
   // 1. Fill previous month prefix days
   for (let i = startDayOfWeek - 1; i >= 0; i--) {
@@ -102,11 +164,24 @@ export default function CalendarView({
     });
   }
 
+  const weeks: CalendarCell[][] = [];
+  for (let i = 0; i < calendarCells.length; i += 7) {
+    weeks.push(calendarCells.slice(i, i + 7));
+  }
+
+  const visibleStart = weeks[0][0].dateStr;
+  const visibleEnd = weeks[weeks.length - 1][6].dateStr;
+  const relevantMultiDayEvents = events.filter(
+    (e) => isMultiDay(e) && e.date <= visibleEnd && (e.endDate as string) >= visibleStart
+  );
+  const laneMap = assignLanes(relevantMultiDayEvents);
+
   const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
+  const todayStr = formatLocalDate(new Date());
 
   return (
     <div className="bg-card rounded-3xl border border-border shadow-sm p-4.5 select-none relative overflow-hidden transition-all duration-200">
-      
+
       {/* ── Calendar Navigation Header ── */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-display font-medium text-foreground text-lg tracking-tight">
@@ -152,62 +227,108 @@ export default function CalendarView({
         })}
       </div>
 
-      {/* ── Calendar Grid ── */}
-      <div className="grid grid-cols-7 gap-1 text-center">
-        {calendarCells.map(({ dateStr, dayNum, isCurrentMonth }, idx) => {
-          const isSelected = selectedDate === dateStr;
-          const todayStr = formatLocalDate(new Date());
-          const isToday = todayStr === dateStr;
-
-          const dayEvents = events.filter((e) => e.date === dateStr);
-          const hasEvents = dayEvents.length > 0;
-
-          // Align cell day of week weekend styling
-          const cellDayOfWeek = idx % 7;
-          let numColor = isCurrentMonth ? 'text-foreground/90' : 'text-muted-foreground/35';
-          if (isCurrentMonth) {
-            if (cellDayOfWeek === 0) numColor = 'text-red-500/85 font-medium'; // Sunday weekend styling
-            if (cellDayOfWeek === 6) numColor = 'text-sky-500/85 font-medium'; // Saturday weekend styling
-          }
-
-          const borderClass = isSelected
-            ? 'bg-gradient-to-br from-accent to-accent-secondary border-transparent shadow-accent active:scale-95'
-            : isToday
-              ? 'border-accent bg-accent/5 hover:bg-accent/10'
-              : 'border-transparent hover:bg-muted/50';
+      {/* ── Calendar Grid (rendered week-by-week so multi-day bars can span columns) ── */}
+      <div className="space-y-1">
+        {weeks.map((week, weekIdx) => {
+          const { lanes, overflow } = computeWeekBars(week, relevantMultiDayEvents, laneMap);
+          const hasOverflow = overflow.some((n) => n > 0);
 
           return (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => onSelectDate(dateStr)}
-              className={`aspect-square w-full rounded-2xl border flex flex-col items-center justify-center relative transition duration-150 cursor-pointer ${borderClass}`}
-            >
-              <span className={`text-[13px] leading-none
-                ${isSelected ? 'text-white font-bold'
-                  : isToday ? 'text-accent font-bold'
-                  : numColor}`}>
-                {dayNum}
-              </span>
+            <div className="relative" key={weekIdx}>
+              <div className="grid grid-cols-7 gap-1 text-center">
+                {week.map(({ dateStr, dayNum, isCurrentMonth }, idx) => {
+                  const isSelected = selectedDate === dateStr;
+                  const isToday = todayStr === dateStr;
 
-              {hasEvents && (
-                <div className="absolute bottom-1 flex gap-0.5 justify-center">
-                  {dayEvents.slice(0, 3).map((ev, eIdx) => (
-                    <span
-                      key={ev.id || eIdx}
-                      className={`w-1.5 h-1.5 rounded-full
-                        ${isSelected
-                          ? 'bg-white' 
-                          : isToday
-                            ? 'bg-accent'
-                            : isPastDate(dateStr)
-                              ? 'bg-slate-300'
-                              : getGatheringTypeDotClass(ev.gatheringType)}`}
-                    />
-                  ))}
-                </div>
-              )}
-            </button>
+                  const dayEvents = events.filter((e) => e.date === dateStr && !isMultiDay(e));
+                  const hasEvents = dayEvents.length > 0;
+
+                  let numColor = isCurrentMonth ? 'text-foreground/90' : 'text-muted-foreground/35';
+                  if (isCurrentMonth) {
+                    if (idx === 0) numColor = 'text-red-500/85 font-medium'; // Sunday weekend styling
+                    if (idx === 6) numColor = 'text-sky-500/85 font-medium'; // Saturday weekend styling
+                  }
+
+                  const borderClass = isSelected
+                    ? 'bg-gradient-to-br from-accent to-accent-secondary border-transparent shadow-accent active:scale-95'
+                    : isToday
+                      ? 'border-accent bg-accent/5 hover:bg-accent/10'
+                      : 'border-transparent hover:bg-muted/50';
+
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => onSelectDate(dateStr)}
+                      className={`h-14 w-full rounded-2xl border flex flex-col items-center pt-1.5 gap-1 relative transition duration-150 cursor-pointer ${borderClass}`}
+                    >
+                      <span className={`text-[13px] leading-none
+                        ${isSelected ? 'text-white font-bold'
+                          : isToday ? 'text-accent font-bold'
+                          : numColor}`}>
+                        {dayNum}
+                      </span>
+
+                      {hasEvents && (
+                        <div className="flex gap-0.5 justify-center">
+                          {dayEvents.slice(0, 3).map((ev, eIdx) => (
+                            <span
+                              key={ev.id || eIdx}
+                              className={`w-1.5 h-1.5 rounded-full
+                                ${isSelected
+                                  ? 'bg-white'
+                                  : isToday
+                                    ? 'bg-accent'
+                                    : isPastDate(dateStr)
+                                      ? 'bg-slate-300'
+                                      : getGatheringTypeDotClass(ev.gatheringType)}`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* ── Multi-day event bars (overlay, spans across day columns) ── */}
+              <div className="absolute inset-x-0 bottom-1 flex flex-col gap-[2px] pointer-events-none">
+                {lanes.map((segments, laneIdx) => (
+                  <div key={laneIdx} className="grid grid-cols-7 gap-1 h-[6px]">
+                    {segments.map((seg) => (
+                      <div
+                        key={seg.event.id}
+                        onClick={() => onSelectDate(seg.event.date)}
+                        title={seg.event.title}
+                        style={{ gridColumn: `${seg.startCol + 1} / ${seg.endCol + 2}` }}
+                        className={`h-full pointer-events-auto cursor-pointer ${getGatheringTypeDotClass(seg.event.gatheringType)}
+                          ${seg.continuesLeft ? '' : 'rounded-l-full'}
+                          ${seg.continuesRight ? '' : 'rounded-r-full'}`}
+                      />
+                    ))}
+                  </div>
+                ))}
+
+                {hasOverflow && (
+                  <div className="grid grid-cols-7 gap-1">
+                    {overflow.map((count, i) =>
+                      count > 0 ? (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => onSelectDate(week[i].dateStr)}
+                          className="pointer-events-auto cursor-pointer text-[8px] leading-none font-bold text-muted-foreground hover:text-accent"
+                        >
+                          +{count}
+                        </button>
+                      ) : (
+                        <div key={i} />
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           );
         })}
       </div>
@@ -233,8 +354,8 @@ export default function CalendarView({
                 }
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[10px] font-semibold transition-all duration-200 cursor-pointer
-                ${isActive 
-                  ? `${colors.bg} ${colors.border} ${colors.text} font-bold scale-105 shadow-sm` 
+                ${isActive
+                  ? `${colors.bg} ${colors.border} ${colors.text} font-bold scale-105 shadow-sm`
                   : 'text-muted-foreground border-border hover:bg-muted'
                 }
                 ${isAnyActive && !isActive ? 'opacity-40 scale-95' : 'opacity-100'}
