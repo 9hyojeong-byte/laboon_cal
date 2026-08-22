@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Calendar, Clock, MapPin, AlignLeft, Users, UserPlus, Sparkles, Link, Waves, Edit2, Trash2 } from 'lucide-react';
 import { ScheduleEvent } from '../types';
 import { formatTime } from '../lib/timeUtils';
+import { getAuthorNameFromTitle } from '../lib/eventAuthor';
 
 interface EventDetailModalProps {
   event: ScheduleEvent;
@@ -86,6 +87,18 @@ export default function EventDetailModal({
     return event.attendees.split(',').map(n => n.trim()).filter(n => n.length > 0);
   };
   const attendees = getAttendeesList();
+
+  // The author's name is pinned from the title, not from array position,
+  // since attendee fetch order isn't guaranteed stable -- pinning by index
+  // let whoever ended up first after an add/remove visually "become" the
+  // author. Falls back to index 0 only for legacy events whose title has no
+  // parseable author segment.
+  const titleAuthorName = getAuthorNameFromTitle(event.title, event.location);
+  const hasResolvedAuthor = !!titleAuthorName && attendees.includes(titleAuthorName);
+  const authorName = hasResolvedAuthor ? titleAuthorName : (attendees[0] || null);
+  const orderedAttendees = hasResolvedAuthor
+    ? [titleAuthorName as string, ...attendees.filter((n) => n !== titleAuthorName)]
+    : attendees;
 
   const handleAddAttendee = async (name: string) => {
     const now = Date.now();
@@ -296,26 +309,36 @@ export default function EventDetailModal({
               </span>
             </div>
 
-            {attendees.length === 0 ? (
+            {orderedAttendees.length === 0 ? (
               <div className="text-center py-6 bg-card rounded-xl border border-dashed border-border">
                 <p className="text-xs font-semibold text-muted-foreground">아직 등록된 참석자가 없어요.</p>
                 <p className="text-[10px] text-muted-foreground/60 mt-0.5">가장 먼저 참석 등록을 해보세요!</p>
               </div>
             ) : (
               <div className="flex flex-wrap gap-1.5 bg-muted/10 p-3 rounded-xl border border-border min-h-12">
-                {attendees.map((name, index) => {
-                  const isLeader = index === 0;
-                  const badgeClasses = isLeader
-                    ? 'bg-amber-400 border-amber-500 text-slate-950 font-extrabold hover:bg-red-500 hover:border-red-600 hover:text-white'
-                    : 'bg-slate-900 border-transparent text-white font-medium hover:bg-red-500 hover:text-white';
+                {orderedAttendees.map((name) => {
+                  const isLeader = name === authorName;
+
+                  if (isLeader) {
+                    return (
+                      <span
+                        key={name}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs bg-amber-400 border-amber-500 text-slate-950 font-extrabold"
+                        title="작성자 (참석 취소 불가)"
+                      >
+                        <span>👑 {name}</span>
+                      </span>
+                    );
+                  }
+
                   return (
                     <button
                       key={name}
                       onClick={() => handleRemoveAttendee(name)}
-                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs transition duration-150 cursor-pointer ${badgeClasses}`}
-                      title={isLeader ? '작성자 (클릭 시 참석 취소)' : '참석 취소'}
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs transition duration-150 cursor-pointer bg-slate-900 border-transparent text-white font-medium hover:bg-red-500 hover:text-white"
+                      title="참석 취소"
                     >
-                      <span>{isLeader ? `👑 ${name}` : name}</span>
+                      <span>{name}</span>
                       <X className="w-3.5 h-3.5 opacity-60" strokeWidth={1.5} />
                     </button>
                   );
