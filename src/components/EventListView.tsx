@@ -3,6 +3,7 @@ import { Edit2, Trash2, Plus, Settings, X, CalendarDays, Link } from 'lucide-rea
 import { ScheduleEvent } from '../types';
 import { formatTime, isPastDate } from '../lib/timeUtils';
 import { getSessionTimeRange, formatLocationName } from '../lib/locationSessions';
+import { getAuthorNameFromTitle } from '../lib/eventAuthor';
 
 interface EventListViewProps {
   selectedDate: string;
@@ -224,7 +225,17 @@ function EventCard({
   };
   const sideColorClass = typeBarColors[ev.gatheringType || ''] || 'bg-slate-300';
 
-  const attendeesCount = ev.attendees ? ev.attendees.split(',').map(n => n.trim()).filter(Boolean).length : 0;
+  const attendeeNames = ev.attendees ? ev.attendees.split(',').map(n => n.trim()).filter(Boolean) : [];
+  const attendeesCount = attendeeNames.length;
+
+  // Pin the true author (from the title, not array position) first, since
+  // attendee fetch order isn't guaranteed stable.
+  const titleAuthorName = getAuthorNameFromTitle(ev.title, ev.location);
+  const hasResolvedAuthor = !!titleAuthorName && attendeeNames.includes(titleAuthorName);
+  const authorName = hasResolvedAuthor ? titleAuthorName : (attendeeNames[0] || null);
+  const orderedAttendeeNames = hasResolvedAuthor
+    ? [titleAuthorName as string, ...attendeeNames.filter((n) => n !== titleAuthorName)]
+    : attendeeNames;
 
   return (
     <div
@@ -236,13 +247,27 @@ function EventCard({
 
       {/* 1. Top row: Date, New, Share */}
       <div className="flex items-center justify-between shrink-0 select-none">
-        <div className="flex items-baseline gap-1.5">
+        <div className="flex items-baseline gap-1.5 flex-wrap">
           <span className="font-sans font-bold text-[17px] text-foreground leading-none">
             {dateInfo.dateText}
           </span>
           <span className="text-xs font-semibold text-muted-foreground leading-none">
             {dateInfo.dayText}
           </span>
+          {ev.endDate && ev.endDate !== ev.date && (() => {
+            const endDateInfo = formatScreenshotStyleDate(ev.endDate);
+            return (
+              <>
+                <span className="text-xs font-semibold text-muted-foreground/60 leading-none">~</span>
+                <span className="font-sans font-bold text-[17px] text-foreground leading-none">
+                  {endDateInfo.dateText}
+                </span>
+                <span className="text-xs font-semibold text-muted-foreground leading-none">
+                  {endDateInfo.dayText}
+                </span>
+              </>
+            );
+          })()}
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -263,14 +288,13 @@ function EventCard({
       </div>
 
       {/* 2. Location & Gathering Type Row */}
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-semibold select-none shrink-0">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold select-none shrink-0">
         {ev.gatheringType && (
-          <span className={`px-2.5 py-0.5 rounded-full border text-[9px] font-bold ${typeColor}`}>
+          <span className={`px-3 py-1 rounded-full border-2 text-[12px] font-extrabold ${typeColor}`}>
             {ev.gatheringType}
           </span>
         )}
-        {ev.gatheringType && <span>·</span>}
-        <span className={`px-2.5 py-0.5 rounded-full border text-[9px] font-bold ${locColor}`}>
+        <span className={`px-3 py-1 rounded-full border-2 text-[12px] font-extrabold ${locColor}`}>
           {formatLocationName(ev.location)}
         </span>
       </div>
@@ -308,8 +332,8 @@ function EventCard({
         <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-4 select-none shrink-0">
           {/* Attendees List */}
           <div className="flex flex-wrap gap-1.5 flex-1">
-            {ev.attendees.split(',').map(n => n.trim()).filter(Boolean).map((name, idx) => {
-              const isLeader = idx === 0;
+            {orderedAttendeeNames.map((name) => {
+              const isLeader = name === authorName;
               const attendeeBadgeClass = isLeader
                 ? 'bg-[#FEF3C7] border border-[#F59E0B]/30 text-[#92400E] font-bold shadow-sm'
                 : 'bg-slate-100 border border-transparent text-slate-700 font-medium';
