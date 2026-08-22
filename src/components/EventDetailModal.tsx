@@ -192,9 +192,12 @@ export default function EventDetailModal({
     '두류':   'bg-amber-50 border-amber-100 text-amber-650 font-bold',
     '문수':   'bg-rose-50 border-rose-100 text-rose-650 font-bold',
     '알프스': 'bg-indigo-50 border-indigo-100 text-indigo-650 font-bold',
-    '자유일정':'bg-violet-50 border-violet-100 text-violet-650 font-bold',
   };
-  const locColor = locationColors[event.location || ''] || 'bg-slate-50 border-slate-100 text-slate-500';
+  // A location not in the preset list is a custom (직접입력) location -- make
+  // it stand out instead of falling back to the muted "unknown" gray.
+  const locColor = !event.location
+    ? 'bg-slate-50 border-slate-100 text-slate-500'
+    : locationColors[event.location] || 'bg-[#1A4D6C] border-[#1A4D6C] text-white font-extrabold shadow-sm';
 
   return (
     <div className="fixed inset-0 bg-foreground/20 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-md">

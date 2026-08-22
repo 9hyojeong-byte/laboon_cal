@@ -7,7 +7,7 @@ export interface ScheduleEvent {
   endTime: string | null; // HH:MM
   description: string | null;
   createdAt: string;
-  location?: string | null; // Location (딥스, 파라, 밀양, 북항, 패나, 풀6, 두류, 문수, 알프스, 자유일정)
+  location?: string | null; // Location (딥스, 파라, 밀양, 북항, 패나, 풀6, 두류, 문수, 알프스, 직접입력)
   attendees?: string | null; // Comma-separated or similar string of attendee names
   deepTankUsage?: string | null; // 딥탱크 이용시간: "전반부이", "후반부이" 등
   company?: string | null; // 업체명

@@ -15,7 +15,8 @@ interface EventFormProps {
   defaultGatheringType?: string;
 }
 
-const LOCATIONS = ['딥스', '파라', '밀양', '북항', '패나', '풀6', '두류', '문수', '알프스', '자유일정'] as const;
+const LOCATIONS = ['딥스', '파라', '밀양', '북항', '패나', '풀6', '두류', '문수', '알프스', '직접입력'] as const;
+const CUSTOM_LOCATION_OPTION = '직접입력';
 type LocationType = typeof LOCATIONS[number];
 const GATHERING_TYPES = ['트레이닝', '교육', '투어', '같이가요', '기타'] as const;
 const ALL_DAY_OPTION = '하루종일';
@@ -128,6 +129,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
   const [date, setDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [location, setLocation] = useState<LocationType>('딥스');
+  const [customLocationName, setCustomLocationName] = useState('');
   const [isAllDay, setIsAllDay] = useState(false);
   const [session, setSession] = useState('1부');
   const [deepTankUsage, setDeepTankUsage] = useState<string | null>(null);
@@ -148,6 +150,12 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
   const justLoadedRef = useRef(false);
 
   const buoyTimes = getBuoyTimes(session);
+
+  // The actual location value to save/display: the preset name, or the
+  // free-text name typed in when "직접입력" is selected.
+  const effectiveLocation = location === CUSTOM_LOCATION_OPTION
+    ? (customLocationName.trim() || CUSTOM_LOCATION_OPTION)
+    : location;
 
   useEffect(() => {
     const savedName = localStorage.getItem('lastAuthorName') || localStorage.getItem('lastAttendeeName') || '';
@@ -185,19 +193,27 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
       }
 
       let detLocation: LocationType = '딥스';
+      let detCustomLocation = '';
       if (editingEvent.location && LOCATIONS.includes(editingEvent.location as any)) {
         detLocation = editingEvent.location as LocationType;
+      } else if (editingEvent.location) {
+        // A saved location that isn't one of the presets -- treat it as a
+        // "직접입력" (custom) location and preload the free-text field with it.
+        detLocation = CUSTOM_LOCATION_OPTION;
+        detCustomLocation = editingEvent.location;
       } else {
+        // No location saved at all (very old data) -- fall back to guessing
+        // from the title text.
         const fullText = `${editingEvent.title} ${editingEvent.description || ''}`;
-        const matched = LOCATIONS.find((loc) => loc !== '자유일정' && fullText.includes(loc));
+        const matched = LOCATIONS.find((loc) => loc !== CUSTOM_LOCATION_OPTION && fullText.includes(loc));
         if (matched) detLocation = matched;
-        else if (fullText.includes('자유일정')) detLocation = '자유일정';
       }
       setLocation(detLocation);
+      setCustomLocationName(detCustomLocation);
 
       const hasEndDateRange = !!editingEvent.endDate && editingEvent.endDate !== editingEvent.date;
-      // 자유일정 has no time picker at all -- it's always all-day.
-      const isDayAll = detLocation === '자유일정' || !editingEvent.startTime || hasEndDateRange;
+      // 직접입력 (custom) locations have no time picker at all -- always all-day.
+      const isDayAll = detLocation === CUSTOM_LOCATION_OPTION || !editingEvent.startTime || hasEndDateRange;
       setIsAllDay(isDayAll);
       const sessionsForLocation = LOCATION_SESSIONS[detLocation] || [];
       if (!isDayAll && editingEvent.startTime) {
@@ -207,7 +223,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
         setSession(sessionsForLocation[0] || '1부');
       }
     } else {
-      setDate(selectedDate); setEndDate(selectedDate); setLocation('딥스');
+      setDate(selectedDate); setEndDate(selectedDate); setLocation('딥스'); setCustomLocationName('');
       setIsAllDay(false); setSession('1부'); setDeepTankUsage(null); setDescription('');
       setCompany(''); setGatheringType(defaultGatheringType || '트레이닝');
       setAuthor(savedName);
@@ -241,9 +257,9 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
   };
 
   useEffect(() => {
-    const autoTitle = buildAutoTitle(author, location, session, deepTankUsage, isAllDay, earlyLateEntry);
+    const autoTitle = buildAutoTitle(author, effectiveLocation, session, deepTankUsage, isAllDay, earlyLateEntry);
     setTitle(autoTitle);
-  }, [author, location, session, deepTankUsage, isAllDay, earlyLateEntry]);
+  }, [author, effectiveLocation, session, deepTankUsage, isAllDay, earlyLateEntry]);
 
   useEffect(() => {
     if (justLoadedRef.current) {
@@ -274,6 +290,10 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
     if (!title.trim() || !date) { alert('일정 제목과 날짜는 필수입니다.'); return; }
     if (endDate && endDate < date) {
       alert('종료 날짜는 시작 날짜보다 빠를 수 없습니다.');
+      return;
+    }
+    if (location === CUSTOM_LOCATION_OPTION && !customLocationName.trim()) {
+      alert('장소명을 입력해주세요.');
       return;
     }
 
@@ -311,7 +331,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
       endTime: editingEvent ? editingEvent.endTime : null,
       deepTankUsage: (location === '딥스' || location === '파라') ? (deepTankUsage || null) : null,
       description: description.trim() || null,
-      location,
+      location: effectiveLocation,
       attendees: combinedAttendees,
       company: editingEvent ? (editingEvent.company || COMPANY_CODE) : COMPANY_CODE,
       gatheringType: gatheringType || null,
@@ -399,10 +419,10 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
                     onClick={() => {
                       const prevLocation = location;
                       setLocation(loc);
-                      if (loc !== '자유일정') {
+                      if (loc !== CUSTOM_LOCATION_OPTION) {
                         setSession(LOCATION_SESSIONS[loc]?.[0] || '1부');
                         setEndDate(date);
-                        if (prevLocation === '자유일정') {
+                        if (prevLocation === CUSTOM_LOCATION_OPTION) {
                           setIsAllDay(false);
                         }
                       } else {
@@ -422,14 +442,25 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
                 );
               })}
             </div>
+            {location === CUSTOM_LOCATION_OPTION && (
+              <input
+                type="text"
+                required
+                placeholder="장소명을 입력하세요 (예: 우리동네 수영장)"
+                value={customLocationName}
+                onChange={(e) => setCustomLocationName(e.target.value)}
+                className="w-full mt-1.5 px-4 py-2.5 border border-border bg-muted/20 rounded-xl text-sm font-medium text-foreground placeholder:text-muted-foreground/45 transition-all focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:bg-card animate-pop-in"
+                autoFocus
+              />
+            )}
           </div>
 
           {/* 4. Date Selection */}
-          <div className={location === '자유일정' ? 'grid grid-cols-2 gap-3' : 'space-y-4'}>
+          <div className={location === CUSTOM_LOCATION_OPTION ? 'grid grid-cols-2 gap-3' : 'space-y-4'}>
             <div className="space-y-1.5">
               <label className="text-[10px] font-mono font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-accent" />
-                {location === '자유일정' ? '시작 날짜 *' : '날짜 *'}
+                {location === CUSTOM_LOCATION_OPTION ? '시작 날짜 *' : '날짜 *'}
               </label>
               <input
                 type="date"
@@ -438,7 +469,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
                 onChange={(e) => {
                   const newDate = e.target.value;
                   setDate(newDate);
-                  if (location !== '자유일정' || !endDate || endDate < newDate) {
+                  if (location !== CUSTOM_LOCATION_OPTION || !endDate || endDate < newDate) {
                     setEndDate(newDate);
                   } else if (endDate !== newDate) {
                     setIsAllDay(true);
@@ -448,7 +479,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
               />
             </div>
 
-            {location === '자유일정' && (
+            {location === CUSTOM_LOCATION_OPTION && (
               <div className="space-y-1.5 animate-pop-in">
                 <label className="text-[10px] font-mono font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 text-accent" />종료 날짜 *
@@ -477,7 +508,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
 
           {/* 4. Time Selection (includes a "하루종일" option in place of a separate all-day toggle) */}
           <div className="space-y-3">
-            {location !== '자유일정' && (
+            {location !== CUSTOM_LOCATION_OPTION && (
               <div className="space-y-1.5">
                 <label className="text-[10px] font-mono font-semibold text-muted-foreground uppercase tracking-wider">
                   시간 (부 선택) *

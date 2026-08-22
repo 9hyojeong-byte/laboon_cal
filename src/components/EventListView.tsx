@@ -148,9 +148,12 @@ function EventCard({
     '두류':   'bg-amber-50 border-amber-100 text-amber-650 font-bold',
     '문수':   'bg-rose-50 border-rose-100 text-rose-650 font-bold',
     '알프스': 'bg-indigo-50 border-indigo-100 text-indigo-650 font-bold',
-    '자유일정':'bg-violet-50 border-violet-100 text-violet-650 font-bold',
   };
-  const locColor = locationColors[ev.location || ''] || 'bg-slate-50 border-slate-100 text-slate-500';
+  // A location not in the preset list is a custom (직접입력) location -- make
+  // it stand out instead of falling back to the muted "unknown" gray.
+  const locColor = !ev.location
+    ? 'bg-slate-50 border-slate-100 text-slate-500'
+    : locationColors[ev.location] || 'bg-[#1A4D6C] border-[#1A4D6C] text-white font-extrabold shadow-sm';
 
   const typeColors: Record<string, string> = {
     '트레이닝': 'bg-sky-50 border-sky-100 text-sky-700 font-bold',
