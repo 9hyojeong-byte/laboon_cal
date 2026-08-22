@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Calendar, Clock, AlignLeft, Check, MapPin, User, Waves } from 'lucide-react';
+import { X, Calendar, AlignLeft, Check, MapPin, User, Waves } from 'lucide-react';
 import { ScheduleEvent } from '../types';
-import { formatTime, normalizeToHourLabel } from '../lib/timeUtils';
+import { formatTime } from '../lib/timeUtils';
 import { LOCATION_SESSIONS, SESSION_TIME_RANGES } from '../lib/locationSessions';
 import { COMPANY_CODE } from '../lib/supabaseApi';
 import { getAuthorNameFromTitle } from '../lib/eventAuthor';
@@ -17,8 +17,8 @@ interface EventFormProps {
 
 const LOCATIONS = ['딥스', '파라', '밀양', '북항', '패나', '풀6', '두류', '문수', '알프스', '자유일정'] as const;
 type LocationType = typeof LOCATIONS[number];
-const HOURS = Array.from({ length: 24 }, (_, i) => `${i}시`);
 const GATHERING_TYPES = ['트레이닝', '같이가요', '교육', '투어', '기타'] as const;
+const ALL_DAY_OPTION = '하루종일';
 
 const getBuoyTimes = (sess: string) => {
   const mapping: Record<string, { early: string; late: string }> = {
@@ -60,7 +60,6 @@ function buildAutoTitle(
   authorName: string,
   loc: string,
   sess: string,
-  hr: string,
   deepTank: string | null,
   allDay: boolean,
   specialEntry: boolean
@@ -72,7 +71,7 @@ function buildAutoTitle(
   }
   parts.push(loc);
 
-  const timeStr = allDay ? '하루종일' : (loc !== '자유일정' ? sess : hr);
+  const timeStr = allDay ? '하루종일' : sess;
   parts.push(timeStr);
 
   if (!allDay && (loc === '딥스' || loc === '파라') && deepTank) {
@@ -131,7 +130,6 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
   const [location, setLocation] = useState<LocationType>('딥스');
   const [isAllDay, setIsAllDay] = useState(false);
   const [session, setSession] = useState('1부');
-  const [hour, setHour] = useState('12시');
   const [deepTankUsage, setDeepTankUsage] = useState<string | null>(null);
   const [description, setDescription] = useState('');
   
@@ -204,24 +202,19 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
       const sessionsForLocation = LOCATION_SESSIONS[detLocation] || [];
       if (!isDayAll && editingEvent.startTime) {
         const raw = editingEvent.startTime;
-        if (detLocation !== '자유일정') {
-          setSession(sessionsForLocation.includes(raw) ? raw : sessionsForLocation[0] || '1부');
-        } else {
-          setHour(normalizeToHourLabel(raw));
-        }
+        setSession(sessionsForLocation.includes(raw) ? raw : sessionsForLocation[0] || '1부');
       } else {
         setSession(sessionsForLocation[0] || '1부');
-        setHour('12시');
       }
     } else {
       setDate(selectedDate); setEndDate(selectedDate); setLocation('딥스');
-      setIsAllDay(false); setSession('1부'); setHour('12시'); setDeepTankUsage(null); setDescription('');
+      setIsAllDay(false); setSession('1부'); setDeepTankUsage(null); setDescription('');
       setCompany(''); setGatheringType(defaultGatheringType || '트레이닝');
       setAuthor(savedName);
       setEarlyLateEntry(true);
 
       const initialAuthor = savedName.trim() || '';
-      const initialTitle = buildAutoTitle(initialAuthor, '딥스', '1부', '12시', null, false, true);
+      const initialTitle = buildAutoTitle(initialAuthor, '딥스', '1부', null, false, true);
       setTitle(initialTitle);
     }
     justLoadedRef.current = true;
@@ -248,9 +241,9 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
   };
 
   useEffect(() => {
-    const autoTitle = buildAutoTitle(author, location, session, hour, deepTankUsage, isAllDay, earlyLateEntry);
+    const autoTitle = buildAutoTitle(author, location, session, deepTankUsage, isAllDay, earlyLateEntry);
     setTitle(autoTitle);
-  }, [author, location, session, hour, deepTankUsage, isAllDay, earlyLateEntry]);
+  }, [author, location, session, deepTankUsage, isAllDay, earlyLateEntry]);
 
   useEffect(() => {
     if (justLoadedRef.current) {
@@ -306,15 +299,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
       combinedAttendees = trimmedAuthor || null;
     }
 
-    let finalStartTime: string | null = null;
-    if (!isAllDay) {
-      if (location !== '자유일정') {
-        finalStartTime = session;
-      } else {
-        const hNum = parseInt(hour.replace('시', ''), 10);
-        finalStartTime = `${String(hNum).padStart(2, '0')}:00`;
-      }
-    }
+    const finalStartTime: string | null = isAllDay ? null : session;
 
     onSave({
       ...editingEvent,
@@ -421,7 +406,6 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
                           setIsAllDay(false);
                         }
                       } else {
-                        setHour('12시');
                         setIsAllDay(true);
                       }
                       if (loc !== '딥스' && loc !== '파라') {
@@ -491,138 +475,101 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
 
 
 
-          {/* 4. Time Selection */}
-          {!isAllDay && (
-            <div className="space-y-3">
+          {/* 4. Time Selection (includes a "하루종일" option in place of a separate all-day toggle) */}
+          <div className="space-y-3">
+            {location !== '자유일정' && (
               <div className="space-y-1.5">
-                {location !== '자유일정' ? (
-                  <>
-                    <label className="text-[10px] font-mono font-semibold text-muted-foreground uppercase tracking-wider">
-                      시간 (부 선택) *
-                    </label>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {(LOCATION_SESSIONS[location] || []).map((sess) => {
-                        const isActive = session === sess;
-                        return (
-                          <button
-                            key={sess}
-                            type="button"
-                            onClick={() => setSession(sess)}
-                            className={`px-3.5 py-2 text-xs font-semibold rounded-xl border transition cursor-pointer duration-155
-                              ${isActive
-                                ? 'bg-accent border-accent text-white shadow-sm'
-                                : 'bg-card border-border text-muted-foreground hover:bg-muted'}`}
-                          >
-                            {sess}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {SESSION_TIME_RANGES[location]?.[session] && (
-                      <p className="text-[10.5px] text-muted-foreground font-medium pl-0.5">
-                        {SESSION_TIME_RANGES[location][session]}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <label className="text-[10px] font-mono font-semibold text-muted-foreground uppercase tracking-wider">
-                      시간 (정각 단위) *
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={hour}
-                        onChange={(e) => setHour(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-border bg-muted/20 rounded-xl text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:bg-card transition cursor-pointer appearance-none"
+                <label className="text-[10px] font-mono font-semibold text-muted-foreground uppercase tracking-wider">
+                  시간 (부 선택) *
+                </label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {[...(LOCATION_SESSIONS[location] || []), ALL_DAY_OPTION].map((sess) => {
+                    const isActive = sess === ALL_DAY_OPTION ? isAllDay : (!isAllDay && session === sess);
+                    return (
+                      <button
+                        key={sess}
+                        type="button"
+                        onClick={() => {
+                          if (sess === ALL_DAY_OPTION) {
+                            setIsAllDay(true);
+                          } else {
+                            setIsAllDay(false);
+                            setSession(sess);
+                          }
+                        }}
+                        className={`px-3.5 py-2 text-xs font-semibold rounded-xl border transition cursor-pointer duration-155
+                          ${isActive
+                            ? 'bg-accent border-accent text-white shadow-sm'
+                            : 'bg-card border-border text-muted-foreground hover:bg-muted'}`}
                       >
-                        {HOURS.map((h) => (
-                          <option key={h} value={h}>{h}</option>
-                        ))}
-                      </select>
-                      <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-semibold">
-                        ▼
-                      </div>
-                    </div>
-                  </>
+                        {sess}
+                      </button>
+                    );
+                  })}
+                </div>
+                {!isAllDay && SESSION_TIME_RANGES[location]?.[session] && (
+                  <p className="text-[10.5px] text-muted-foreground font-medium pl-0.5">
+                    {SESSION_TIME_RANGES[location][session]}
+                  </p>
                 )}
               </div>
+            )}
 
-              {(location === '딥스' || location === '파라') && (
-                <div className="space-y-2 bg-sky-50/20 p-3.5 rounded-2xl border border-sky-100/50 animate-pop-in">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-mono font-semibold text-sky-900/80 uppercase tracking-wider flex items-center gap-1.5">
-                      <Waves className="w-3.5 h-3.5 text-sky-500" strokeWidth={2} />
-                      딥탱크 이용시간
-                    </label>
-                    {deepTankUsage && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeepTankClick(deepTankUsage)}
-                        className="text-[10px] font-semibold text-sky-700 hover:underline cursor-pointer"
-                      >
-                        선택 해제
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    {['전반부이', '후반부이'].map((option) => {
-                      const isActive = deepTankUsage === option;
-                      return (
-                        <button
-                          key={option}
-                          type="button"
-                          onClick={() => handleDeepTankClick(option)}
-                          className={`flex-1 py-2.5 text-xs font-semibold rounded-xl border transition cursor-pointer duration-150 flex items-center justify-center gap-1
-                            ${isActive
-                              ? 'bg-sky-500 border-sky-500 text-white shadow-sm font-bold'
-                              : 'bg-card border-sky-200/50 text-sky-700/80 hover:bg-sky-50/50'}`}
-                        >
-                          <span>{option}</span>
-                          {isActive && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
-                        </button>
-                      );
-                    })}
-                  </div>
+            {!isAllDay && (location === '딥스' || location === '파라') && (
+              <div className="space-y-2 bg-sky-50/20 p-3.5 rounded-2xl border border-sky-100/50 animate-pop-in">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-mono font-semibold text-sky-900/80 uppercase tracking-wider flex items-center gap-1.5">
+                    <Waves className="w-3.5 h-3.5 text-sky-500" strokeWidth={2} />
+                    딥탱크 이용시간
+                  </label>
                   {deepTankUsage && (
-                    <div className="mt-3 pt-3 border-t border-sky-100/50 flex items-center justify-between animate-pop-in">
-                      <span className="text-[11px] font-semibold text-sky-900/80">
-                        {deepTankUsage === '전반부이' ? `30분 빠른입장 (${buoyTimes.early})` : `30분 늦은입장 (${buoyTimes.late})`}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleEntry(!earlyLateEntry)}
-                        className={`w-10 h-5.5 rounded-full relative flex items-center transition-colors cursor-pointer border border-sky-200/50
-                          ${earlyLateEntry ? 'bg-sky-500 border-sky-500' : 'bg-slate-200'}`}
-                      >
-                        <span className={`w-3.5 h-3.5 rounded-full bg-card shadow-sm transition-transform absolute
-                          ${earlyLateEntry ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeepTankClick(deepTankUsage)}
+                      className="text-[10px] font-semibold text-sky-700 hover:underline cursor-pointer"
+                    >
+                      선택 해제
+                    </button>
                   )}
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* All Day Toggle (자유일정 is always all-day, so there's nothing to toggle) */}
-          {location !== '자유일정' && (
-            <div className="flex items-center justify-between py-3 px-4 bg-card rounded-xl border border-border">
-              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-muted-foreground" strokeWidth={2} />
-                하루 종일 진행
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsAllDay(!isAllDay)}
-                className={`w-11 h-6 rounded-full relative flex items-center transition-colors cursor-pointer border border-border/80 bg-muted
-                  ${isAllDay ? 'bg-accent border-accent' : 'bg-slate-200'}`}
-              >
-                <span className={`w-4 h-4 rounded-full bg-card shadow-sm transition-transform absolute
-                  ${isAllDay ? 'translate-x-5.5' : 'translate-x-0.5'}`} />
-              </button>
-            </div>
-          )}
-
+                <div className="flex gap-2">
+                  {['전반부이', '후반부이'].map((option) => {
+                    const isActive = deepTankUsage === option;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => handleDeepTankClick(option)}
+                        className={`flex-1 py-2.5 text-xs font-semibold rounded-xl border transition cursor-pointer duration-150 flex items-center justify-center gap-1
+                          ${isActive
+                            ? 'bg-sky-500 border-sky-500 text-white shadow-sm font-bold'
+                            : 'bg-card border-sky-200/50 text-sky-700/80 hover:bg-sky-50/50'}`}
+                      >
+                        <span>{option}</span>
+                        {isActive && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+                      </button>
+                    );
+                  })}
+                </div>
+                {deepTankUsage && (
+                  <div className="mt-3 pt-3 border-t border-sky-100/50 flex items-center justify-between animate-pop-in">
+                    <span className="text-[11px] font-semibold text-sky-900/80">
+                      {deepTankUsage === '전반부이' ? `30분 빠른입장 (${buoyTimes.early})` : `30분 늦은입장 (${buoyTimes.late})`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleEntry(!earlyLateEntry)}
+                      className={`w-10 h-5.5 rounded-full relative flex items-center transition-colors cursor-pointer border border-sky-200/50
+                        ${earlyLateEntry ? 'bg-sky-500 border-sky-500' : 'bg-slate-200'}`}
+                    >
+                      <span className={`w-3.5 h-3.5 rounded-full bg-card shadow-sm transition-transform absolute
+                        ${earlyLateEntry ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
 
           {/* 6. Description */}

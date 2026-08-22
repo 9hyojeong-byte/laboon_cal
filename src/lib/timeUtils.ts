@@ -51,29 +51,6 @@ export function formatTime(timeStr: string | null | undefined): string {
 }
 
 /**
- * Normalizes an hour string like "12시" or "12" or "12:00" into just "12시" for the dropdown selector
- */
-export function normalizeToHourLabel(timeStr: string | null | undefined): string {
-  const formatted = formatTime(timeStr);
-  if (!formatted) return '12시';
-
-  if (formatted.includes(':')) {
-    const parts = formatted.split(':');
-    const h = parseInt(parts[0], 10);
-    if (!isNaN(h) && h >= 0 && h < 24) {
-      return `${h}시`;
-    }
-  }
-
-  const numericMatch = formatted.match(/^(\d+)시?$/);
-  if (numericMatch) {
-    return `${numericMatch[1]}시`;
-  }
-
-  return '12시';
-}
-
-/**
  * Returns today's date string in local timezone as YYYY-MM-DD
  */
 export function getTodayDateStr(): string {
