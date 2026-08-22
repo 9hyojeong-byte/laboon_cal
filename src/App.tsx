@@ -349,6 +349,10 @@ export default function App() {
     });
   };
 
+  const handleGoToToday = () => {
+    setCurrentCalendarDate(new Date());
+  };
+
   const handleSearch = () => {
     setSearchQuery(searchVal);
     if (searchVal.trim()) {
@@ -495,6 +499,7 @@ export default function App() {
             events={filteredEvents}
             onSelectDate={setSelectedDate}
             onNavigateMonth={handleNavigateMonth}
+            onGoToToday={handleGoToToday}
             selectedGatheringType={selectedGatheringType}
             onSelectGatheringType={setSelectedGatheringType}
             visibleTypes={TAB_GROUPS[activeTab]}

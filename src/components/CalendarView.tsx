@@ -10,6 +10,7 @@ interface CalendarViewProps {
   events: ScheduleEvent[];
   onSelectDate: (dateStr: string) => void;
   onNavigateMonth: (offset: number) => void;
+  onGoToToday: () => void;
   selectedGatheringType: string | null;
   onSelectGatheringType: (type: string | null) => void;
   visibleTypes?: string[];
@@ -102,6 +103,7 @@ export default function CalendarView({
   events,
   onSelectDate,
   onNavigateMonth,
+  onGoToToday,
   selectedGatheringType,
   onSelectGatheringType,
   visibleTypes,
@@ -196,9 +198,8 @@ export default function CalendarView({
           </button>
           <button
             onClick={() => {
-              const today = new Date();
-              onNavigateMonth(0); // reset to current month (handles reset inside App.tsx or month calculations)
-              onSelectDate(formatLocalDate(today));
+              onGoToToday();
+              onSelectDate(todayStr);
             }}
             className="px-2.5 py-1 hover:bg-card hover:text-foreground rounded-lg text-[10px] font-bold tracking-tight transition cursor-pointer text-muted-foreground uppercase"
           >
