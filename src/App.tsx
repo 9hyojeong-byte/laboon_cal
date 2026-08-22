@@ -17,7 +17,7 @@ import { supabase } from './lib/supabaseClient';
 
 const TAB_GROUPS: Record<string, string[]> = {
   '다이빙 교육 신청': ['교육'],
-  '정기트레이닝/벙/투어': ['트레이닝', '같이가요', '투어', '기타'],
+  '정기트레이닝/벙/투어': ['트레이닝', '투어', '같이가요', '기타'],
 };
 const TAB_NAMES = Object.keys(TAB_GROUPS);
 

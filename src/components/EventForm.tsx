@@ -17,7 +17,7 @@ interface EventFormProps {
 
 const LOCATIONS = ['딥스', '파라', '밀양', '북항', '패나', '풀6', '두류', '문수', '알프스', '자유일정'] as const;
 type LocationType = typeof LOCATIONS[number];
-const GATHERING_TYPES = ['트레이닝', '같이가요', '교육', '투어', '기타'] as const;
+const GATHERING_TYPES = ['트레이닝', '교육', '투어', '같이가요', '기타'] as const;
 const ALL_DAY_OPTION = '하루종일';
 
 const getBuoyTimes = (sess: string) => {
