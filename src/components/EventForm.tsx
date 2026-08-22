@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Calendar, Clock, AlignLeft, Check, MapPin, User, Waves } from 'lucide-react';
 import { ScheduleEvent } from '../types';
 import { formatTime, normalizeToHourLabel } from '../lib/timeUtils';
 import { LOCATION_SESSIONS, SESSION_TIME_RANGES } from '../lib/locationSessions';
 import { COMPANY_CODE } from '../lib/supabaseApi';
+import { getAuthorNameFromTitle } from '../lib/eventAuthor';
+import { GATHERING_TYPE_COLORS } from '../lib/gatheringTypeColors';
 
 interface EventFormProps {
   selectedDate: string;
@@ -137,6 +139,16 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
   const [gatheringType, setGatheringType] = useState<string>('트레이닝');
   const [earlyLateEntry, setEarlyLateEntry] = useState(true);
 
+  // The load effect below and the auto-description effect both run in the
+  // same effect-flush right after mount/editingEvent change. The
+  // auto-description effect reacts to session/deepTankUsage/earlyLateEntry,
+  // but on that first pass it still sees their pre-load closure values (React
+  // applies this effect's setState calls on the *next* render, not
+  // mid-flush), so it would wipe out a just-loaded description before the
+  // load ever visibly takes effect. This ref lets it skip exactly that one
+  // stale run right after a load.
+  const justLoadedRef = useRef(false);
+
   const buoyTimes = getBuoyTimes(session);
 
   useEffect(() => {
@@ -161,7 +173,14 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
         ? editingEvent.attendees.split(',').map(s => s.trim()).filter(Boolean)
         : [];
 
-      if (attendeesList.length > 0) {
+      // Prefer the author embedded in the title over attendees[0], since
+      // attendee fetch order isn't guaranteed stable -- seeding from array
+      // position let editing an event silently reassign authorship to
+      // whichever attendee happened to come back first.
+      const titleAuthorName = getAuthorNameFromTitle(editingEvent.title, editingEvent.location);
+      if (titleAuthorName && attendeesList.includes(titleAuthorName)) {
+        setAuthor(titleAuthorName);
+      } else if (attendeesList.length > 0) {
         setAuthor(attendeesList[0]);
       } else {
         setAuthor(savedName);
@@ -178,7 +197,9 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
       }
       setLocation(detLocation);
 
-      const isDayAll = !editingEvent.startTime;
+      const hasEndDateRange = !!editingEvent.endDate && editingEvent.endDate !== editingEvent.date;
+      // 자유일정 has no time picker at all -- it's always all-day.
+      const isDayAll = detLocation === '자유일정' || !editingEvent.startTime || hasEndDateRange;
       setIsAllDay(isDayAll);
       const sessionsForLocation = LOCATION_SESSIONS[detLocation] || [];
       if (!isDayAll && editingEvent.startTime) {
@@ -203,6 +224,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
       const initialTitle = buildAutoTitle(initialAuthor, '딥스', '1부', '12시', null, false, true);
       setTitle(initialTitle);
     }
+    justLoadedRef.current = true;
   }, [editingEvent, selectedDate, defaultGatheringType]);
 
   const handleDeepTankClick = (option: string) => {
@@ -231,6 +253,10 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
   }, [author, location, session, hour, deepTankUsage, isAllDay, earlyLateEntry]);
 
   useEffect(() => {
+    if (justLoadedRef.current) {
+      justLoadedRef.current = false;
+      return;
+    }
     if (isAutoDescription(description)) {
       if (deepTankUsage === '전반부이') {
         if (earlyLateEntry) {
@@ -267,7 +293,14 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
     let combinedAttendees: string | null = null;
     if (editingEvent && editingEvent.attendees) {
       const existingList = editingEvent.attendees.split(',').map(s => s.trim()).filter(Boolean);
-      const rest = existingList.slice(1).filter(s => s !== trimmedAuthor);
+      // Drop the true original author (from the title, not array position)
+      // so we don't accidentally drop a different attendee when fetch order
+      // isn't stable, and don't leave the original author duplicated.
+      const originalAuthorName = getAuthorNameFromTitle(editingEvent.title, editingEvent.location);
+      const droppedName = originalAuthorName && existingList.includes(originalAuthorName)
+        ? originalAuthorName
+        : existingList[0];
+      const rest = existingList.filter((s) => s !== droppedName && s !== trimmedAuthor);
       combinedAttendees = trimmedAuthor ? [trimmedAuthor, ...rest].join(', ') : (rest.join(', ') || null);
     } else {
       combinedAttendees = trimmedAuthor || null;
@@ -348,6 +381,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
             <div className="flex gap-1.5 flex-wrap">
               {GATHERING_TYPES.map((type) => {
                 const isActive = gatheringType === type;
+                const dotColor = GATHERING_TYPE_COLORS[type]?.dot || 'bg-accent';
                 return (
                   <button
                     key={type}
@@ -355,7 +389,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
                     onClick={() => setGatheringType(type)}
                     className={`px-3.5 py-1.5 text-[11px] font-semibold rounded-full border transition cursor-pointer duration-150
                       ${isActive
-                        ? 'bg-accent border-accent text-white shadow-sm'
+                        ? `${dotColor} ${dotColor.replace('bg-', 'border-')} text-white shadow-sm`
                         : 'bg-card border-border text-muted-foreground hover:bg-muted'}`}
                   >
                     {type}
@@ -378,12 +412,17 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
                     key={loc}
                     type="button"
                     onClick={() => {
+                      const prevLocation = location;
                       setLocation(loc);
                       if (loc !== '자유일정') {
                         setSession(LOCATION_SESSIONS[loc]?.[0] || '1부');
                         setEndDate(date);
+                        if (prevLocation === '자유일정') {
+                          setIsAllDay(false);
+                        }
                       } else {
                         setHour('12시');
+                        setIsAllDay(true);
                       }
                       if (loc !== '딥스' && loc !== '파라') {
                         setDeepTankUsage(null);
@@ -402,7 +441,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
           </div>
 
           {/* 4. Date Selection */}
-          <div className="space-y-4">
+          <div className={location === '자유일정' ? 'grid grid-cols-2 gap-3' : 'space-y-4'}>
             <div className="space-y-1.5">
               <label className="text-[10px] font-mono font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-accent" />
@@ -413,12 +452,15 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
                 required
                 value={date}
                 onChange={(e) => {
-                  setDate(e.target.value);
-                  if (location !== '자유일정' || !endDate || endDate < e.target.value) {
-                    setEndDate(e.target.value);
+                  const newDate = e.target.value;
+                  setDate(newDate);
+                  if (location !== '자유일정' || !endDate || endDate < newDate) {
+                    setEndDate(newDate);
+                  } else if (endDate !== newDate) {
+                    setIsAllDay(true);
                   }
                 }}
-                className="w-full px-4 py-2.5 border border-border bg-muted/20 rounded-xl text-sm font-medium text-foreground transition focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:bg-card"
+                className="w-full px-3 py-2.5 border border-border bg-muted/20 rounded-xl text-sm font-medium text-foreground transition focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:bg-card"
               />
             </div>
 
@@ -431,9 +473,15 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
                   type="date"
                   required
                   value={endDate || date}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  onChange={(e) => {
+                    const newEndDate = e.target.value;
+                    setEndDate(newEndDate);
+                    if (newEndDate && newEndDate !== date) {
+                      setIsAllDay(true);
+                    }
+                  }}
                   min={date}
-                  className="w-full px-4 py-2.5 border border-border bg-muted/20 rounded-xl text-sm font-medium text-foreground transition focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:bg-card"
+                  className="w-full px-3 py-2.5 border border-border bg-muted/20 rounded-xl text-sm font-medium text-foreground transition focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:bg-card"
                 />
               </div>
             )}
@@ -556,22 +604,24 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
             </div>
           )}
 
-          {/* All Day Toggle */}
-          <div className="flex items-center justify-between py-3 px-4 bg-card rounded-xl border border-border">
-            <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-muted-foreground" strokeWidth={2} />
-              하루 종일 진행
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsAllDay(!isAllDay)}
-              className={`w-11 h-6 rounded-full relative flex items-center transition-colors cursor-pointer border border-border/80 bg-muted
-                ${isAllDay ? 'bg-accent border-accent' : 'bg-slate-200'}`}
-            >
-              <span className={`w-4 h-4 rounded-full bg-card shadow-sm transition-transform absolute
-                ${isAllDay ? 'translate-x-5.5' : 'translate-x-0.5'}`} />
-            </button>
-          </div>
+          {/* All Day Toggle (자유일정 is always all-day, so there's nothing to toggle) */}
+          {location !== '자유일정' && (
+            <div className="flex items-center justify-between py-3 px-4 bg-card rounded-xl border border-border">
+              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-muted-foreground" strokeWidth={2} />
+                하루 종일 진행
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsAllDay(!isAllDay)}
+                className={`w-11 h-6 rounded-full relative flex items-center transition-colors cursor-pointer border border-border/80 bg-muted
+                  ${isAllDay ? 'bg-accent border-accent' : 'bg-slate-200'}`}
+              >
+                <span className={`w-4 h-4 rounded-full bg-card shadow-sm transition-transform absolute
+                  ${isAllDay ? 'translate-x-5.5' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+          )}
 
 
 
