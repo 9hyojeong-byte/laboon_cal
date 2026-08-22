@@ -4,6 +4,7 @@ import { ScheduleEvent } from '../types';
 import { formatTime, isPastDate } from '../lib/timeUtils';
 import { getSessionTimeRange, formatLocationName } from '../lib/locationSessions';
 import { getAuthorNameFromTitle } from '../lib/eventAuthor';
+import { linkifyText } from '../lib/linkifyText';
 
 interface EventListViewProps {
   selectedDate: string;
@@ -121,13 +122,14 @@ function EventCard({
   ev,
   colorIdx,
   onEventClick,
+  onCopySuccess,
 }: {
   ev: ScheduleEvent;
   colorIdx: number;
   onEventClick: (e: ScheduleEvent) => void;
+  onCopySuccess: () => void;
   showDate?: boolean;
 }) {
-  const [showCopyToast, setShowCopyToast] = useState(false);
   const isPast = isPastDate(ev.date);
   const color = stickerColors[colorIdx % stickerColors.length];
 
@@ -179,11 +181,10 @@ function EventCard({
       ? `${attendeesList.join(', ')} (${attendeesList.length}명)`
       : '없음';
 
-    const companyText = ev.company ? `\n• 업체: ${ev.company}` : '';
     const typeText = ev.gatheringType ? ` [${ev.gatheringType}]` : '';
 
     const textToCopy = `📅 [라분다이브 일정]${typeText}
-• 일시: ${formattedDate} (${timeText}${deepTankText})${companyText}
+• 일시: ${formattedDate} (${timeText}${deepTankText})
 • 장소: ${locationText}
 • 메모: ${ev.description || '-'}
 • 참석자: ${attendeesText}
@@ -191,8 +192,7 @@ function EventCard({
 
     try {
       await navigator.clipboard.writeText(textToCopy);
-      setShowCopyToast(true);
-      setTimeout(() => setShowCopyToast(false), 2000);
+      onCopySuccess();
     } catch (err) {
       console.error('Failed to copy link:', err);
       alert('링크 복사에 실패했습니다.');
@@ -243,7 +243,7 @@ function EventCard({
       className={`${cardBg} rounded-3xl border ${cardBorder} ${hoverClasses} p-5 transition-all duration-200 flex flex-col space-y-4 relative overflow-hidden pl-7 shadow-sm cursor-pointer`}
     >
       {/* Side Color stripe */}
-      <div className={`absolute left-0 top-0 bottom-0 w-[5px] ${sideColorClass}`} />
+      <div className={`absolute left-0 top-0 h-full w-[5px] ${sideColorClass}`} />
 
       {/* 1. Top row: Date, New, Share */}
       <div className="flex items-center justify-between shrink-0 select-none">
@@ -323,7 +323,7 @@ function EventCard({
       {ev.description && (
         <div className="text-xs md:text-[13px] text-foreground/80 font-medium leading-relaxed break-all whitespace-pre-line flex-1 flex items-start gap-2">
           <span className="shrink-0 select-none">💬</span>
-          <span>{ev.description}</span>
+          <span>{linkifyText(ev.description)}</span>
         </div>
       )}
 
@@ -367,6 +367,12 @@ export default function EventListView({
   searchQuery,
   isAdminMode = false,
 }: EventListViewProps) {
+  const [showCopyToast, setShowCopyToast] = useState(false);
+  const handleCopySuccess = () => {
+    setShowCopyToast(true);
+    setTimeout(() => setShowCopyToast(false), 2000);
+  };
+
   // 1. 데이터 준비 (필터링 및 정렬)
   let displayEvents: ScheduleEvent[] = [];
   let isFiltered = false;
@@ -467,8 +473,17 @@ export default function EventListView({
               ev={ev}
               colorIdx={idx}
               onEventClick={onEventClick}
+              onCopySuccess={handleCopySuccess}
             />
           ))}
+        </div>
+      )}
+
+      {/* Copy Link Toast Notification -- rendered once here (not per-card) and
+          fixed to the viewport so it can never affect any card's layout. */}
+      {showCopyToast && (
+        <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-foreground text-background text-xs font-semibold px-4 py-2.5 rounded-xl border border-border shadow-lg z-[60] animate-pop-in flex items-center gap-1.5 whitespace-nowrap">
+          <span>일정 링크가 복사되었습니다! 🔗</span>
         </div>
       )}
     </div>

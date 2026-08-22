@@ -3,6 +3,7 @@ import { X, Calendar, Clock, MapPin, AlignLeft, Users, UserPlus, Sparkles, Link,
 import { ScheduleEvent } from '../types';
 import { formatTime } from '../lib/timeUtils';
 import { getAuthorNameFromTitle } from '../lib/eventAuthor';
+import { linkifyText } from '../lib/linkifyText';
 
 interface EventDetailModalProps {
   event: ScheduleEvent;
@@ -56,11 +57,10 @@ export default function EventDetailModal({
       ? `${attendeesList.join(', ')} (${attendeesList.length}명)`
       : '없음';
 
-    const companyText = event.company ? `\n• 업체: ${event.company}` : '';
     const typeText = event.gatheringType ? ` [${event.gatheringType}]` : '';
 
     const textToCopy = `📅 [라분다이브 일정]${typeText}
-• 일시: ${formattedDate} (${timeText}${deepTankText})${companyText}
+• 일시: ${formattedDate} (${timeText}${deepTankText})
 • 장소: ${locationText}
 • 메모: ${event.description || '-'}
 • 참석자: ${attendeesText}
@@ -293,7 +293,7 @@ export default function EventDetailModal({
                 <AlignLeft className="w-3.5 h-3.5 text-accent" />메모
               </label>
               <div className="bg-muted/15 p-4 rounded-xl border border-border text-sm font-medium text-muted-foreground leading-relaxed break-all whitespace-pre-line">
-                {event.description}
+                {linkifyText(event.description)}
               </div>
             </div>
           )}
