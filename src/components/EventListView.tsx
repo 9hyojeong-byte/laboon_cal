@@ -302,18 +302,20 @@ function EventCard({
         </span>
       </div>
 
-      {/* 3. Time Box Bar */}
-      <div className="bg-[#EFF6FF] py-2.5 px-4 rounded-2xl flex items-center justify-between gap-3 select-none text-[11px] font-semibold text-[#1E40AF]">
-        <div className="flex items-center gap-2">
-          <span>🕒</span>
-          <span className="font-bold">{sessionText}</span>
+      {/* 3. Time Box Bar (only meaningful when a specific 부/시간 is set) */}
+      {ev.startTime && (
+        <div className="bg-[#EFF6FF] py-2.5 px-4 rounded-2xl flex items-center justify-between gap-3 select-none text-[11px] font-semibold text-[#1E40AF]">
+          <div className="flex items-center gap-2">
+            <span>🕒</span>
+            <span className="font-bold">{sessionText}</span>
+          </div>
+          {entryText && (
+            <span className="text-[#4B5563] text-[10px] font-medium">
+              {entryText}
+            </span>
+          )}
         </div>
-        {entryText && (
-          <span className="text-[#4B5563] text-[10px] font-medium">
-            {entryText}
-          </span>
-        )}
-      </div>
+      )}
 
       {/* 4. Deep Tank Buoy details */}
       {ev.deepTankUsage && buoyDetail && (
