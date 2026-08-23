@@ -59,7 +59,12 @@ export async function fetchSchedules(): Promise<ScheduleEvent[]> {
     `)
     .is('deleted_at', null)
     .eq('company', COMPANY_CODE)
-    .order('start_date', { ascending: true });
+    .order('start_date', { ascending: true })
+    // Without an explicit order, Postgres/Supabase gives no guarantee on the
+    // nested schedule_attendees row order, so the displayed attendee order
+    // (and which one looks like the "first"/leader) could shuffle between
+    // fetches even though nothing changed.
+    .order('created_at', { referencedTable: 'schedule_attendees', ascending: true });
 
   if (error) {
     console.error('Failed to fetch schedules from Supabase:', error);
