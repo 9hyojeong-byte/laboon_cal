@@ -214,7 +214,7 @@ function EventCard({
       ? (isLate ? `${buoyTimes.late} 늦은입장` : '정시 입장')
       : '';
 
-  const timeRange = ev.startTime ? getSessionTimeRange(ev.location, ev.startTime) : '';
+  const timeRange = ev.startTime ? getSessionTimeRange(ev.location, ev.startTime, ev.date) : '';
   const sessionText = ev.startTime 
     ? (timeRange ? `${ev.startTime} · ${timeRange}` : ev.startTime)
     : '하루종일';

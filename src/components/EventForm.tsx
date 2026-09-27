@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Calendar, AlignLeft, Check, MapPin, User, Waves } from 'lucide-react';
 import { ScheduleEvent } from '../types';
 import { formatTime } from '../lib/timeUtils';
-import { LOCATION_SESSIONS, SESSION_TIME_RANGES } from '../lib/locationSessions';
+import { getLocationSessions, getSessionTimeRange } from '../lib/locationSessions';
 import { COMPANY_CODE } from '../lib/supabaseApi';
 import { getAuthorNameFromTitle } from '../lib/eventAuthor';
 import { GATHERING_TYPE_COLORS } from '../lib/gatheringTypeColors';
@@ -215,7 +215,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
       // 직접입력 (custom) locations have no time picker at all -- always all-day.
       const isDayAll = detLocation === CUSTOM_LOCATION_OPTION || !editingEvent.startTime || hasEndDateRange;
       setIsAllDay(isDayAll);
-      const sessionsForLocation = LOCATION_SESSIONS[detLocation] || [];
+      const sessionsForLocation = getLocationSessions(detLocation, editingEvent.date);
       if (!isDayAll && editingEvent.startTime) {
         const raw = editingEvent.startTime;
         setSession(sessionsForLocation.includes(raw) ? raw : sessionsForLocation[0] || '1부');
@@ -420,7 +420,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
                       const prevLocation = location;
                       setLocation(loc);
                       if (loc !== CUSTOM_LOCATION_OPTION) {
-                        setSession(LOCATION_SESSIONS[loc]?.[0] || '1부');
+                        setSession(getLocationSessions(loc, date)[0] || '1부');
                         setEndDate(date);
                         if (prevLocation === CUSTOM_LOCATION_OPTION) {
                           setIsAllDay(false);
@@ -514,7 +514,7 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
                   시간 (부 선택) *
                 </label>
                 <div className="flex gap-1.5 flex-wrap">
-                  {[...(LOCATION_SESSIONS[location] || []), ALL_DAY_OPTION].map((sess) => {
+                  {[...getLocationSessions(location, date), ALL_DAY_OPTION].map((sess) => {
                     const isActive = sess === ALL_DAY_OPTION ? isAllDay : (!isAllDay && session === sess);
                     return (
                       <button
@@ -538,9 +538,9 @@ export default function EventForm({ selectedDate, editingEvent, onSave, onCancel
                     );
                   })}
                 </div>
-                {!isAllDay && SESSION_TIME_RANGES[location]?.[session] && (
+                {!isAllDay && getSessionTimeRange(location, session, date) && (
                   <p className="text-[10.5px] text-muted-foreground font-medium pl-0.5">
-                    {SESSION_TIME_RANGES[location][session]}
+                    {getSessionTimeRange(location, session, date)}
                   </p>
                 )}
               </div>
