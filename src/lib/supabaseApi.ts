@@ -157,69 +157,128 @@ export async function createSchedule(event: Omit<ScheduleEvent, 'createdAt'>): P
   }
 }
 
+// ScheduleEvent field -> schedules column, for the fields an edit can change.
+const SCHEDULE_COLUMNS: [keyof ScheduleEvent, string][] = [
+  ['title', 'title'],
+  ['description', 'description'],
+  ['date', 'start_date'],
+  ['endDate', 'end_date'],
+  ['startTime', 'start_time'],
+  ['endTime', 'end_time'],
+  ['location', 'location'],
+  ['company', 'company'],
+  ['gatheringType', 'gathering_type'],
+  ['deepTankUsage', 'deep_tank_usage'],
+];
+
+const normalizeField = (v: unknown) => (v === undefined || v === '' ? null : v);
+
+const splitAttendees = (attendees: string | null | undefined): string[] =>
+  attendees ? attendees.split(',').map(s => s.trim()).filter(Boolean) : [];
+
 /**
- * Update an existing schedule and synchonize the creator nickname
+ * Save an edit to an existing schedule, touching only what the editor changed.
+ *
+ * `original` is the snapshot the edit form was opened with. Only columns that
+ * differ between it and `updated` are written, so two people editing
+ * different fields of the same event at once don't overwrite each other.
+ *
+ * Attendees are never rewritten wholesale or compared against whoever is
+ * currently first in the DB -- only the names this edit added/removed
+ * relative to its own snapshot (in practice: an author name change) are
+ * applied, one row at a time. Attendees someone else added/removed in the
+ * meantime are left alone.
  */
-export async function updateSchedule(event: ScheduleEvent): Promise<void> {
+export async function updateSchedule(original: ScheduleEvent, updated: ScheduleEvent): Promise<void> {
   if (!isSupabaseConfigured) {
     const mock = getMockData();
-    const idx = mock.findIndex(e => e.id === event.id);
+    const idx = mock.findIndex(e => e.id === updated.id);
     if (idx !== -1) {
-      mock[idx] = event;
+      mock[idx] = updated;
       saveMockData(mock);
     }
     return;
   }
 
-  // 1. Update schedule info
-  const { error } = await supabase
-    .from('schedules')
-    .update({
-      title: event.title,
-      description: event.description,
-      start_date: event.date,
-      end_date: event.endDate || null,
-      start_time: event.startTime || null,
-      end_time: event.endTime || null,
-      location: event.location || null,
-      company: event.company || null,
-      gathering_type: event.gatheringType || null,
-      deep_tank_usage: event.deepTankUsage || null,
-    })
-    .eq('id', event.id);
-
-  if (error) {
-    console.error('Failed to update schedule in Supabase:', error);
-    throw error;
+  // 1. Update only the changed schedule columns
+  const changes: Record<string, unknown> = {};
+  for (const [field, column] of SCHEDULE_COLUMNS) {
+    const before = normalizeField(original[field]);
+    const after = normalizeField(updated[field]);
+    if (before !== after) changes[column] = after;
   }
 
-  // 2. Sync creator name (first element in list)
-  if (event.attendees) {
-    const firstAttendee = event.attendees.split(',')[0].trim();
-    if (firstAttendee) {
-      const { data: currentAttendees } = await supabase
-        .from('schedule_attendees')
-        .select('nickname')
-        .eq('schedule_id', event.id)
-        .order('created_at', { ascending: true });
+  if (Object.keys(changes).length > 0) {
+    const { error } = await supabase
+      .from('schedules')
+      .update(changes)
+      .eq('id', updated.id);
 
-      if (currentAttendees && currentAttendees.length > 0) {
-        const currentLeader = currentAttendees[0].nickname;
-        if (currentLeader !== firstAttendee) {
-          await supabase
-            .from('schedule_attendees')
-            .update({ nickname: firstAttendee })
-            .eq('schedule_id', event.id)
-            .eq('nickname', currentLeader);
-        }
-      } else {
-        await supabase
-          .from('schedule_attendees')
-          .insert({
-            schedule_id: event.id,
-            nickname: firstAttendee
-          });
-      }
+    if (error) {
+      console.error('Failed to update schedule in Supabase:', error);
+      throw error;
+    }
+  }
+
+  // 2. Apply only the attendee names this edit added/removed
+  const beforeNames = splitAttendees(original.attendees);
+  const afterNames = splitAttendees(updated.attendees);
+  let removed = beforeNames.filter(n => !afterNames.includes(n));
+  const added = afterNames.filter(n => !beforeNames.includes(n));
+  if (removed.length === 0 && added.length === 0) return;
+
+  // Check against the DB's current list (not our snapshot) so we don't
+  // duplicate a name someone else already added meanwhile.
+  const { data: currentRows, error: fetchErr } = await supabase
+    .from('schedule_attendees')
+    .select('nickname')
+    .eq('schedule_id', updated.id);
+
+  if (fetchErr) {
+    console.error('Failed to load attendees in Supabase:', fetchErr);
+    throw fetchErr;
+  }
+  const currentNames = (currentRows || []).map((r: any) => r.nickname);
+
+  // Author renamed (one out, one in): rename that single row so it keeps its
+  // place in the registration order.
+  if (
+    removed.length === 1 && added.length === 1 &&
+    currentNames.includes(removed[0]) && !currentNames.includes(added[0])
+  ) {
+    const { error } = await supabase
+      .from('schedule_attendees')
+      .update({ nickname: added[0] })
+      .eq('schedule_id', updated.id)
+      .eq('nickname', removed[0]);
+    if (error) {
+      console.error('Failed to rename attendee in Supabase:', error);
+      throw error;
+    }
+    return;
+  }
+
+  removed = removed.filter(n => currentNames.includes(n));
+  for (const nickname of removed) {
+    const { error } = await supabase
+      .from('schedule_attendees')
+      .delete()
+      .eq('schedule_id', updated.id)
+      .eq('nickname', nickname);
+    if (error) {
+      console.error('Failed to remove attendee in Supabase:', error);
+      throw error;
+    }
+  }
+
+  for (const nickname of added) {
+    if (currentNames.includes(nickname)) continue;
+    const { error } = await supabase
+      .from('schedule_attendees')
+      .insert({ schedule_id: updated.id, nickname });
+    if (error) {
+      console.error('Failed to add attendee in Supabase:', error);
+      throw error;
     }
   }
 }

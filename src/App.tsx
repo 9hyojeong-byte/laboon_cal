@@ -209,13 +209,12 @@ export default function App() {
     setIsLoading(true);
     setSyncStatus('syncing');
     try {
-      const isExisting = events.some(e => String(e.id) === String(formEvent.id));
-      if (isExisting) {
-        const fullEvent: ScheduleEvent = {
-          ...formEvent,
-          createdAt: events.find(e => String(e.id) === String(formEvent.id))?.createdAt || new Date().toISOString()
-        };
-        await updateSchedule(fullEvent);
+      // Diff against the snapshot the form was opened with, not the latest
+      // `events` -- realtime may have refreshed `events` while the form was
+      // open, and diffing against that would revert someone else's change.
+      if (editingEvent && String(editingEvent.id) === String(formEvent.id)) {
+        const fullEvent: ScheduleEvent = { ...formEvent, createdAt: editingEvent.createdAt };
+        await updateSchedule(editingEvent, fullEvent);
       } else {
         await createSchedule(formEvent);
       }
